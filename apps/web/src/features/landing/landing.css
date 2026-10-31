@@ -15,9 +15,18 @@
 
 /* Container */
 .lp-wrap {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 2.5rem;
+  padding: 0 3rem;
+}
+
+/* Nav uses full-width padding, not the constrained container */
+.lp-nav__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 100%;
+  padding: 0 3rem;
 }
 
 /* Shared section header */
@@ -79,12 +88,6 @@
   background: rgba(255, 255, 255, 0.97);
   border-bottom-color: #e5e5e5;
   padding: 0.875rem 0;
-}
-
-.lp-nav__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .lp-nav__brand {
@@ -288,8 +291,8 @@
 /* Feature row */
 .lp-frow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5rem;
+  grid-template-columns: 55% 1fr;
+  gap: 4rem;
   align-items: center;
   opacity: 0;
   transform: translateY(32px);
@@ -537,8 +540,8 @@
 /* Footer */
 .lp-footer {
   border-top: 1px solid #e5e5e5;
-  padding: 2.25rem 0;
-  background: #fff;
+  padding: 3rem 0 2rem;
+  background: #fafafa;
 }
 
 .lp-footer__row {
@@ -547,6 +550,9 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #ebebeb;
+  margin-bottom: 1.5rem;
 }
 
 .lp-footer__brand {
@@ -554,8 +560,9 @@
   align-items: center;
   gap: 0.4rem;
   font-weight: 700;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   color: #111;
+  letter-spacing: -0.02em;
 }
 
 .lp-footer__copy {
@@ -578,6 +585,20 @@
 
 .lp-footer__links a:hover {
   color: #111;
+}
+
+.lp-footer__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.lp-footer__legal {
+  font-size: 0.75rem;
+  color: #bbb;
+  margin: 0;
 }
 
 /* Responsive */
@@ -610,14 +631,20 @@
     padding-top: 7rem;
   }
 
-  .lp-footer__row {
+  .lp-footer__row,
+  .lp-footer__bottom {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.75rem;
   }
 }
 
 @media (max-width: 480px) {
   .lp-wrap {
+    padding: 0 1.25rem;
+  }
+
+  .lp-nav__row {
     padding: 0 1.25rem;
   }
 

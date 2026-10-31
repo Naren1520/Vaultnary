@@ -42,7 +42,7 @@ function LPNav() {
 
   return (
     <header className={`lp-nav ${solid ? 'lp-nav--solid' : ''}`}>
-      <div className="lp-wrap lp-nav__row">
+      <div className="lp-nav__row">
         <Link to="/" className="lp-nav__brand">
           <Lock size={18} strokeWidth={2} aria-hidden="true" />
           Vaultnary
@@ -265,15 +265,25 @@ function LPCta() {
 function LPFooter() {
   return (
     <footer className="lp-footer" role="contentinfo">
-      <div className="lp-wrap lp-footer__row">
-        <span className="lp-footer__brand">
-          <Lock size={15} strokeWidth={2} aria-hidden="true" /> Vaultnary
-        </span>
-        <p className="lp-footer__copy">Your credentials, always under your control.</p>
-        <nav aria-label="Footer links" className="lp-footer__links">
-          <Link to="/register">Get started</Link>
-          <Link to="/login">Sign in</Link>
-        </nav>
+      <div className="lp-wrap">
+        <div className="lp-footer__row">
+          <span className="lp-footer__brand">
+            <Lock size={15} strokeWidth={2} aria-hidden="true" /> Vaultnary
+          </span>
+          <p className="lp-footer__copy">Your credentials, always under your control.</p>
+          <nav aria-label="Footer links" className="lp-footer__links">
+            <Link to="/register">Get started</Link>
+            <Link to="/login">Sign in</Link>
+          </nav>
+        </div>
+        <div className="lp-footer__bottom">
+          <p className="lp-footer__legal">
+            &copy; {new Date().getFullYear()} Naren S J. All rights reserved. Proprietary software — not open source.
+          </p>
+          <p className="lp-footer__legal">
+            narensonu1520@gmail.com
+          </p>
+        </div>
       </div>
     </footer>
   )
