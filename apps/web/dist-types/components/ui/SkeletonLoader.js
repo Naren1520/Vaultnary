@@ -5,7 +5,7 @@ const pulseStyle = {
     animation: 'skeleton-pulse 1.4s ease-in-out infinite',
 };
 /**
- * CSS-only skeleton loader. All animation uses @keyframes — no JS animation.
+ * CSS-only skeleton loader. All animation uses @keyframes -no JS animation.
  * The global keyframe is injected once via a <style> tag in the DOM.
  */
 export default function SkeletonLoader({ variant, rows = 3, className, }) {

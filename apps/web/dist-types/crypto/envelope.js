@@ -23,7 +23,7 @@ export async function generateDek() {
  * 2. Encrypts the JSON-serialised secret with the DEK (AES-256-GCM)
  * 3. Wraps the DEK with the owner's public KEK (RSA-OAEP)
  *
- * The caller uploads both blobs to the server — the server never sees
+ * The caller uploads both blobs to the server -the server never sees
  * either in plaintext.
  */
 export async function sealItem(secret, ownerPublicKey) {

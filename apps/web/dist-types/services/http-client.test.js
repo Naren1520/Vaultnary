@@ -73,7 +73,7 @@ describe('HTTP client', () => {
         mockFetch.mockResolvedValueOnce(makeResponse(401, { error: 'Unauthorized' }));
         useAuthStore.setState({ csrfToken: 'active-csrf' });
         const { apiGet } = await importClient();
-        // Don't await — it never resolves after redirect
+        // Don't await -it never resolves after redirect
         apiGet('/api/v1/protected').catch(() => { });
         await vi.waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'));
         expect(useAuthStore.getState().csrfToken).toBeNull();

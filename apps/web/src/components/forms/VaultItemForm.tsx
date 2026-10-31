@@ -207,7 +207,7 @@ export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps)
             () => null,
           )
           /* Fall back: use the in-memory private key's corresponding public key
-             by fetching from /auth/public-keys — we need the user_id.
+             by fetching from /auth/public-keys -we need the user_id.
              If the endpoint is unavailable, skip encryption gracefully. */
           if (meRes) {
             const userId = meRes.data.id
@@ -224,7 +224,7 @@ export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps)
             encryptedDek = uint8ToBase64(sealed.encryptedDek)
           }
         } catch {
-          /* Encryption failed — still submit metadata without payload */
+          /* Encryption failed -still submit metadata without payload */
         }
       }
 

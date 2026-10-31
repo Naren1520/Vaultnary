@@ -932,13 +932,13 @@ pub async fn recent_items(
     Ok(Json(serde_json::json!({ "data": items })))
 }
 
-/* POST /api/v1/vault/export — 501 stub                               */
+/* POST /api/v1/vault/export -501 stub                               */
 
 pub async fn export_vault() -> impl IntoResponse {
     StatusCode::NOT_IMPLEMENTED
 }
 
-/* POST /api/v1/vault/import — 501 stub                               */
+/* POST /api/v1/vault/import -501 stub                               */
 
 pub async fn import_vault() -> impl IntoResponse {
     StatusCode::NOT_IMPLEMENTED

@@ -66,7 +66,7 @@ export default function VaultItemDetail() {
         </p>
       )}
 
-      {/* Secret field — decrypt wired in Task 21 */}
+      {/* Secret field -decrypt wired in Task 21 */}
       <SecretField itemId={item.id} label="Secret" />
 
       {/* Tags */}

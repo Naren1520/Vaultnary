@@ -182,7 +182,7 @@ fn extract_ip(req: &Request<Body>) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Unit tests — test the window arithmetic logic without a real Redis instance
+// Unit tests -test the window arithmetic logic without a real Redis instance
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -206,7 +206,7 @@ mod tests {
             let now = std::time::Instant::now();
 
             if let Some((count, started_at, stored_window)) = map.get_mut(key) {
-                // Window expired — reset.
+                // Window expired -reset.
                 if now.duration_since(*started_at) >= *stored_window {
                     *count = 1;
                     *started_at = now;
@@ -228,11 +228,11 @@ mod tests {
         let window = Duration::from_secs(60);
         let max = 3u64;
 
-        assert!(counter.check("key1", window, max)); // 1 — allowed
-        assert!(counter.check("key1", window, max)); // 2 — allowed
-        assert!(counter.check("key1", window, max)); // 3 — allowed
-        assert!(!counter.check("key1", window, max)); // 4 — blocked
-        assert!(!counter.check("key1", window, max)); // 5 — still blocked
+        assert!(counter.check("key1", window, max)); // 1 -allowed
+        assert!(counter.check("key1", window, max)); // 2 -allowed
+        assert!(counter.check("key1", window, max)); // 3 -allowed
+        assert!(!counter.check("key1", window, max)); // 4 -blocked
+        assert!(!counter.check("key1", window, max)); // 5 -still blocked
     }
 
     #[test]
@@ -244,15 +244,15 @@ mod tests {
 
         assert!(counter.check("key2", window, max)); // 1
         assert!(counter.check("key2", window, max)); // 2
-        assert!(!counter.check("key2", window, max)); // 3 — blocked
+        assert!(!counter.check("key2", window, max)); // 3 -blocked
 
         // Wait for the window to expire.
         std::thread::sleep(Duration::from_millis(20));
 
         // Counter should reset; requests should be allowed again.
-        assert!(counter.check("key2", window, max)); // 1 again — allowed
-        assert!(counter.check("key2", window, max)); // 2 — allowed
-        assert!(!counter.check("key2", window, max)); // 3 — blocked again
+        assert!(counter.check("key2", window, max)); // 1 again -allowed
+        assert!(counter.check("key2", window, max)); // 2 -allowed
+        assert!(!counter.check("key2", window, max)); // 3 -blocked again
     }
 
     #[test]
@@ -263,12 +263,12 @@ mod tests {
 
         assert!(counter.check("client_a", window, max)); // a:1
         assert!(counter.check("client_a", window, max)); // a:2
-        assert!(!counter.check("client_a", window, max)); // a:3 — blocked
+        assert!(!counter.check("client_a", window, max)); // a:3 -blocked
 
         // client_b has its own independent counter.
-        assert!(counter.check("client_b", window, max)); // b:1 — allowed
-        assert!(counter.check("client_b", window, max)); // b:2 — allowed
-        assert!(!counter.check("client_b", window, max)); // b:3 — blocked
+        assert!(counter.check("client_b", window, max)); // b:1 -allowed
+        assert!(counter.check("client_b", window, max)); // b:2 -allowed
+        assert!(!counter.check("client_b", window, max)); // b:3 -blocked
 
         // client_a is still blocked.
         assert!(!counter.check("client_a", window, max));

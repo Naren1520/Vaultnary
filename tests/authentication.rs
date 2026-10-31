@@ -10,7 +10,7 @@
 
 #[cfg(test)]
 mod auth_integration {
-    // Placeholder — real tests require a running PostgreSQL instance.
+    // Placeholder -real tests require a running PostgreSQL instance.
     // To run: set DATABASE_URL and run `cargo test --test authentication`
 
     #[test]

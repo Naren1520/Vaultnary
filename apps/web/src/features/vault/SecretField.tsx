@@ -8,7 +8,7 @@ import { apiGet } from '../../services/http-client'
 interface SecretFieldProps {
   itemId: string
   label: string
-  /** Pre-decrypted value — overrides remote fetch when provided */
+  /** Pre-decrypted value -overrides remote fetch when provided */
   value?: string
 }
 
@@ -79,7 +79,7 @@ export default function SecretField({ itemId, label, value: preloadedValue }: Se
       const dekBytes = hexOrBase64ToBytes(encrypted_dek)
 
       const secret = await openItem(payloadBytes, dekBytes, privateKey)
-      /* The secret is an object — return a readable representation */
+      /* The secret is an object -return a readable representation */
       return JSON.stringify(secret, null, 2)
     } catch {
       showToast({ message: 'Could not decrypt secret', type: 'error' })

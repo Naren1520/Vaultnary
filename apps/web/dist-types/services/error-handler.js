@@ -17,7 +17,7 @@ export class RateLimitError extends Error {
         this.retryAfterSeconds = retryAfterSeconds;
     }
 }
-/** Thrown on 5xx responses — generic message, no technical details */
+/** Thrown on 5xx responses -generic message, no technical details */
 export class ServerError extends Error {
     status;
     constructor(status) {

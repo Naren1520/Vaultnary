@@ -1,1 +1,1 @@
-// Stub — input validation helpers will be added in Task 10+.
+// Stub -input validation helpers will be added in Task 10+.

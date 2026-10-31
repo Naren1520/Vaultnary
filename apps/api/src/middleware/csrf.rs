@@ -13,7 +13,7 @@ use crate::middleware::auth::AuthUser;
 ///
 /// Only applies to POST, PUT, PATCH, DELETE.
 /// Requests without a valid `AuthUser` extension (unauthenticated) are passed
-/// through — auth middleware is responsible for blocking unauthenticated access.
+/// through -auth middleware is responsible for blocking unauthenticated access.
 #[derive(Clone, Debug, Default)]
 pub struct CsrfGuardLayer;
 

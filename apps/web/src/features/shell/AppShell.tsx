@@ -4,7 +4,7 @@ import ErrorBoundary from '../../components/feedback/ErrorBoundary'
 import { ToastProvider } from '../../components/ui/Toast'
 
 /**
- * Authenticated app shell — sidebar + main content area.
+ * Authenticated app shell -sidebar + main content area.
  * All /app/* routes render inside here via <Outlet />.
  */
 export default function AppShell() {

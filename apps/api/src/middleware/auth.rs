@@ -20,7 +20,7 @@ pub struct AuthUser {
     pub user_id: Uuid,
     /// The session row UUID.
     pub session_id: Uuid,
-    /// SHA-256 hash of the CSRF token — used by `csrf_guard` for validation.
+    /// SHA-256 hash of the CSRF token -used by `csrf_guard` for validation.
     pub csrf_token_hash: String,
 }
 
@@ -76,7 +76,7 @@ where
             let token = match extract_session_cookie(&req) {
                 Some(t) => t,
                 None => {
-                    // No session cookie — pass through without populating AuthUser.
+                    // No session cookie -pass through without populating AuthUser.
                     // Route handlers that require auth will reject the request.
                     return inner.call(req).await;
                 }
@@ -88,12 +88,12 @@ where
             // Look up the session by token hash.
             match lookup_session(&db, &token_hash).await {
                 Ok(Some(auth_user)) => {
-                    // Valid session — attach to request extensions.
+                    // Valid session -attach to request extensions.
                     req.extensions_mut().insert(auth_user);
                     inner.call(req).await
                 }
                 Ok(None) => {
-                    // Invalid, expired, or revoked session — return 401 and clear cookie.
+                    // Invalid, expired, or revoked session -return 401 and clear cookie.
                     Ok(unauthorized_response())
                 }
                 Err(err) => {

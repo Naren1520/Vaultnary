@@ -23,7 +23,7 @@ const pulseStyle: React.CSSProperties = {
 }
 
 /**
- * CSS-only skeleton loader. All animation uses @keyframes — no JS animation.
+ * CSS-only skeleton loader. All animation uses @keyframes -no JS animation.
  * The global keyframe is injected once via a <style> tag in the DOM.
  */
 export default function SkeletonLoader({

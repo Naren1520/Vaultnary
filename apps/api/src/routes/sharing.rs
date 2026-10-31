@@ -239,7 +239,7 @@ pub async fn accept_invitation(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    /* Grant permission — upsert to handle race */
+    /* Grant permission -upsert to handle race */
     sqlx::query(
         "INSERT INTO credential_permissions (id, item_id, user_id, role, created_at)
          VALUES ($1, $2, $3, $4, NOW())

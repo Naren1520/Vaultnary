@@ -14,7 +14,7 @@ use crate::{
 };
 use shared::AppError;
 
-/* GET /api/v1/security/sessions — same data as /auth/sessions */
+/* GET /api/v1/security/sessions -same data as /auth/sessions */
 pub async fn list_sessions(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
@@ -61,7 +61,7 @@ pub async fn list_sessions(
     Ok(Json(serde_json::json!({ "data": sessions })))
 }
 
-/* GET /api/v1/security/events — 50 most recent audit events for this user */
+/* GET /api/v1/security/events -50 most recent audit events for this user */
 pub async fn security_events(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
@@ -107,7 +107,7 @@ pub async fn security_events(
     Ok(Json(serde_json::json!({ "data": events })))
 }
 
-/* GET /api/v1/security/invitations — pending invitations for this user's email */
+/* GET /api/v1/security/invitations -pending invitations for this user's email */
 pub async fn security_invitations(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
@@ -155,7 +155,7 @@ pub async fn security_invitations(
     Ok(Json(serde_json::json!({ "data": items })))
 }
 
-/* GET /api/v1/security/shared-with-me — items shared with user (not as owner) */
+/* GET /api/v1/security/shared-with-me -items shared with user (not as owner) */
 pub async fn shared_with_me(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,

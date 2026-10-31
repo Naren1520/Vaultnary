@@ -38,7 +38,7 @@ function LPHero() {
         window.addEventListener('scroll', fn, { passive: true });
         return () => window.removeEventListener('scroll', fn);
     }, []);
-    return (_jsxs("section", { className: "lp-hero", "aria-label": "Introduction", children: [_jsx("div", { className: "lp-hero__bg", ref: bgRef }), _jsx("div", { className: "lp-hero__scrim", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-hero__body", children: [_jsx("p", { className: "lp-hero__eyebrow reveal", children: "Credential management, done right" }), _jsxs("h1", { className: "lp-hero__h1 reveal", children: ["Every password.", _jsx("br", {}), "Every key.", _jsx("br", {}), "Always secure."] }), _jsx("p", { className: "lp-hero__sub reveal", children: "The one place your team stores, organises, and safely shares credentials \u2014 without ever putting anyone at risk." }), _jsxs("div", { className: "lp-hero__actions reveal", children: [_jsxs(Link, { to: "/register", className: "lp-btn-primary", children: ["Start for free ", _jsx(ArrowRight, { size: 15, strokeWidth: 2.5, "aria-hidden": "true" })] }), _jsx(Link, { to: "/login", className: "lp-btn-ghost", children: "Sign in to vault" })] })] })] }));
+    return (_jsxs("section", { className: "lp-hero", "aria-label": "Introduction", children: [_jsx("div", { className: "lp-hero__bg", ref: bgRef }), _jsx("div", { className: "lp-hero__scrim", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-hero__body", children: [_jsx("p", { className: "lp-hero__eyebrow reveal", children: "Credential management, done right" }), _jsxs("h1", { className: "lp-hero__h1 reveal", children: ["Every password.", _jsx("br", {}), "Every key.", _jsx("br", {}), "Always secure."] }), _jsx("p", { className: "lp-hero__sub reveal", children: "The one place your team stores, organises, and safely shares credentials -without ever putting anyone at risk." }), _jsxs("div", { className: "lp-hero__actions reveal", children: [_jsxs(Link, { to: "/register", className: "lp-btn-primary", children: ["Start for free ", _jsx(ArrowRight, { size: 15, strokeWidth: 2.5, "aria-hidden": "true" })] }), _jsx(Link, { to: "/login", className: "lp-btn-ghost", children: "Sign in to vault" })] })] })] }));
 }
 const logoNames = ['Acme Corp', 'Horizon Labs', 'Stackflow', 'Relay Inc', 'Northgate'];
 function LPLogos() {
@@ -48,7 +48,7 @@ const features = [
     {
         icon: Lock,
         title: 'Yours and only yours',
-        body: 'Everything you save is locked before it leaves your device. Nobody else — including us — can read your secrets.',
+        body: 'Everything you save is locked before it leaves your device. Nobody else -including us -can read your secrets.',
         img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=720&q=80&auto=format&fit=crop',
         alt: 'A single key on a clean surface',
     },
@@ -62,7 +62,7 @@ const features = [
     {
         icon: KeyRound,
         title: 'Every type of credential',
-        body: 'Passwords, API tokens, SSH keys, two-factor codes, database logins — all in one organised, searchable vault.',
+        body: 'Passwords, API tokens, SSH keys, two-factor codes, database logins -all in one organised, searchable vault.',
         img: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=720&q=80&auto=format&fit=crop',
         alt: 'Organised key rack',
     },
@@ -83,7 +83,7 @@ const features = [
     {
         icon: Shield,
         title: 'Never locked out again',
-        body: 'Set a recovery phrase once. If you ever lose access, your vault is still yours to get back — no support ticket needed.',
+        body: 'Set a recovery phrase once. If you ever lose access, your vault is still yours to get back -no support ticket needed.',
         img: 'https://images.unsplash.com/photo-1433888104895-5b54e9988929?w=720&q=80&auto=format&fit=crop',
         alt: 'Spare key on a hook',
     },
@@ -107,7 +107,7 @@ function FeatureRow({ f, flip }) {
 }
 const steps = [
     { n: '01', title: 'Create your vault', body: 'Sign up with your email address. Your private vault is ready in under a minute.' },
-    { n: '02', title: 'Add your credentials', body: 'Type in a password, paste an API key, or store an SSH key — any kind of secret.' },
+    { n: '02', title: 'Add your credentials', body: 'Type in a password, paste an API key, or store an SSH key -any kind of secret.' },
     { n: '03', title: 'Unlock only when you need to', body: 'Your vault stays closed until you open it. Like a physical safe, but in your browser.' },
     { n: '04', title: 'Share just what you choose', body: 'Give one teammate access to one secret. Take it back any time. Nothing more leaks.' },
 ];

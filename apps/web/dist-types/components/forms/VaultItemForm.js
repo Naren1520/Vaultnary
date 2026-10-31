@@ -154,7 +154,7 @@ export default function VaultItemForm({ itemId, onSuccess }) {
                 try {
                     const meRes = await apiGet('/api/v1/users/me').catch(() => null);
                     /* Fall back: use the in-memory private key's corresponding public key
-                       by fetching from /auth/public-keys — we need the user_id.
+                       by fetching from /auth/public-keys -we need the user_id.
                        If the endpoint is unavailable, skip encryption gracefully. */
                     if (meRes) {
                         const userId = meRes.data.id;
@@ -170,7 +170,7 @@ export default function VaultItemForm({ itemId, onSuccess }) {
                     }
                 }
                 catch {
-                    /* Encryption failed — still submit metadata without payload */
+                    /* Encryption failed -still submit metadata without payload */
                 }
             }
             const body = {

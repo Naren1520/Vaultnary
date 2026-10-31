@@ -13,7 +13,7 @@ export default class ErrorBoundary extends React.Component {
         return { hasError: true, message: 'Something went wrong.' };
     }
     componentDidCatch(error) {
-        // Log to console in development only — never expose to the user
+        // Log to console in development only -never expose to the user
         if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
             console.error('[ErrorBoundary]', error);
         }

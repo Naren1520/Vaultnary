@@ -55,7 +55,7 @@ export default function SecretField({ itemId, label, value: preloadedValue }) {
             const payloadBytes = hexOrBase64ToBytes(encrypted_payload);
             const dekBytes = hexOrBase64ToBytes(encrypted_dek);
             const secret = await openItem(payloadBytes, dekBytes, privateKey);
-            /* The secret is an object — return a readable representation */
+            /* The secret is an object -return a readable representation */
             return JSON.stringify(secret, null, 2);
         }
         catch {

@@ -45,50 +45,50 @@
 
 ```
 Vaultnary/
-├── Cargo.toml                  — workspace manifest, shared dependency versions
-├── rust-toolchain.toml         — pins stable Rust toolchain
+├── Cargo.toml                  -workspace manifest, shared dependency versions
+├── rust-toolchain.toml         -pins stable Rust toolchain
 │
 ├── apps/
-│   └── api/                    — Axum binary crate
+│   └── api/                    -Axum binary crate
 │       └── src/
-│           ├── main.rs         — Tokio entry point, calls bootstrap::run()
-│           ├── bootstrap.rs    — wires middleware layers, connects DB + Redis, binds TCP
-│           ├── config.rs       — reads all env vars at startup, panics if missing
-│           ├── state.rs        — AppState (PgPool + RedisPool + Config) wrapped in Arc
-│           ├── error.rs        — ApiError: maps AppError -> HTTP status + JSON body
+│           ├── main.rs         -Tokio entry point, calls bootstrap::run()
+│           ├── bootstrap.rs    -wires middleware layers, connects DB + Redis, binds TCP
+│           ├── config.rs       -reads all env vars at startup, panics if missing
+│           ├── state.rs        -AppState (PgPool + RedisPool + Config) wrapped in Arc
+│           ├── error.rs        -ApiError: maps AppError -> HTTP status + JSON body
 │           ├── middleware/
-│           │   ├── request_id.rs  — attaches X-Request-Id UUID to every request/response
-│           │   ├── rate_limit.rs  — Redis sliding-window counter via atomic Lua script
-│           │   ├── auth.rs        — validates vault_session cookie, populates AuthUser extension
-│           │   └── csrf.rs        — validates X-CSRF-Token on POST/PUT/PATCH/DELETE
+│           │   ├── request_id.rs  -attaches X-Request-Id UUID to every request/response
+│           │   ├── rate_limit.rs  -Redis sliding-window counter via atomic Lua script
+│           │   ├── auth.rs        -validates vault_session cookie, populates AuthUser extension
+│           │   └── csrf.rs        -validates X-CSRF-Token on POST/PUT/PATCH/DELETE
 │           └── routes/
-│               ├── mod.rs         — registers all routes under /api/v1/
-│               ├── auth.rs        — registration, login, logout, password, sessions
-│               ├── vaults.rs      — vault item CRUD, search, favorites, recent
-│               ├── hierarchy.rs   — tree endpoint, children endpoint
-│               ├── projects.rs    — project CRUD + credentials
-│               ├── services.rs    — service CRUD + credentials
-│               ├── usage.rs       — credential usage links
-│               ├── sharing.rs     — invitations, accept/decline/revoke, remove permission
-│               ├── recovery.rs    — recovery setup, recovery endpoint
-│               ├── sessions.rs    — security center: sessions, events, invitations, shared-with-me
-│               ├── audit.rs       — paginated audit event log
-│               └── users.rs       — user profile, lookup by email
+│               ├── mod.rs         -registers all routes under /api/v1/
+│               ├── auth.rs        -registration, login, logout, password, sessions
+│               ├── vaults.rs      -vault item CRUD, search, favorites, recent
+│               ├── hierarchy.rs   -tree endpoint, children endpoint
+│               ├── projects.rs    -project CRUD + credentials
+│               ├── services.rs    -service CRUD + credentials
+│               ├── usage.rs       -credential usage links
+│               ├── sharing.rs     -invitations, accept/decline/revoke, remove permission
+│               ├── recovery.rs    -recovery setup, recovery endpoint
+│               ├── sessions.rs    -security center: sessions, events, invitations, shared-with-me
+│               ├── audit.rs       -paginated audit event log
+│               └── users.rs       -user profile, lookup by email
 │
 ├── crates/
-│   ├── shared/                 — AppError enum, UUID newtypes (UserId, VaultId, etc.)
-│   ├── domain/                 — CredentialType enum, Environment enum, PermissionRole,
+│   ├── shared/                 -AppError enum, UUID newtypes (UserId, VaultId, etc.)
+│   ├── domain/                 -CredentialType enum, Environment enum, PermissionRole,
 │   │                             InvitationState, validate_payload_metadata(), check_cycle()
-│   ├── application/            — (stub) use-case structs for future extraction
-│   ├── persistence/            — (stub) repository trait interfaces
+│   ├── application/            -(stub) use-case structs for future extraction
+│   ├── persistence/            -(stub) repository trait interfaces
 │   └── security/
-│       ├── password_hashing.rs — hash_password(), verify_password() using Argon2id
-│       └── sessions.rs         — generate_token(), generate_csrf_token(), hash_token()
+│       ├── password_hashing.rs -hash_password(), verify_password() using Argon2id
+│       └── sessions.rs         -generate_token(), generate_csrf_token(), hash_token()
 │
-├── migrations/                 — SQL migration files (000-009)
-├── tests/                      — integration test stubs
-├── docs/                       — this documentation
-└── deploy/                     — Dockerfiles, compose.yaml, nginx.conf
+├── migrations/                 -SQL migration files (000-009)
+├── tests/                      -integration test stubs
+├── docs/                       -this documentation
+└── deploy/                     -Dockerfiles, compose.yaml, nginx.conf
 ```
 
 ---
@@ -97,55 +97,55 @@ Vaultnary/
 
 ```
 apps/web/src/
-├── main.tsx                    — React root, mounts <App />, imports global CSS
-├── App.tsx                     — <RouterProvider> wrapper
+├── main.tsx                    -React root, mounts <App />, imports global CSS
+├── App.tsx                     -<RouterProvider> wrapper
 ├── router/
-│   └── routes.tsx              — all routes, ProtectedRoute, VaultUnlockGate
+│   └── routes.tsx              -all routes, ProtectedRoute, VaultUnlockGate
 │
 ├── state/
-│   ├── auth-store.ts           — Zustand: csrfToken (in-memory only)
-│   └── vault-store.ts          — Zustand: masterKey, privateKey, isUnlocked (in-memory only)
+│   ├── auth-store.ts           -Zustand: csrfToken (in-memory only)
+│   └── vault-store.ts          -Zustand: masterKey, privateKey, isUnlocked (in-memory only)
 │
 ├── services/
-│   ├── http-client.ts          — fetch wrapper: CSRF injection, 401/422/429/5xx handling
-│   ├── error-handler.ts        — typed error classes: ValidationError, RateLimitError, ServerError
-│   └── validation.ts           — client-side validators mirroring backend rules
+│   ├── http-client.ts          -fetch wrapper: CSRF injection, 401/422/429/5xx handling
+│   ├── error-handler.ts        -typed error classes: ValidationError, RateLimitError, ServerError
+│   └── validation.ts           -client-side validators mirroring backend rules
 │
 ├── crypto/
-│   ├── kdf.ts                  — deriveKey() via argon2-browser WASM
-│   ├── nonce.ts                — generateNonce() via crypto.getRandomValues
-│   ├── symmetric.ts            — encrypt()/decrypt() using AES-256-GCM (Web Crypto)
-│   ├── asymmetric.ts           — generateKekPair(), encryptDek(), decryptDek() (RSA-OAEP)
-│   ├── envelope.ts             — sealItem(), openItem(), generateDek()
-│   └── vault-session.ts        — unlockVault(), lockVault() integrating vault-store
+│   ├── kdf.ts                  -deriveKey() via argon2-browser WASM
+│   ├── nonce.ts                -generateNonce() via crypto.getRandomValues
+│   ├── symmetric.ts            -encrypt()/decrypt() using AES-256-GCM (Web Crypto)
+│   ├── asymmetric.ts           -generateKekPair(), encryptDek(), decryptDek() (RSA-OAEP)
+│   ├── envelope.ts             -sealItem(), openItem(), generateDek()
+│   └── vault-session.ts        -unlockVault(), lockVault() integrating vault-store
 │
 ├── components/
-│   ├── ui/                     — Sidebar, Topbar, Breadcrumbs, Inspector, SkeletonLoader,
+│   ├── ui/                     -Sidebar, Topbar, Breadcrumbs, Inspector, SkeletonLoader,
 │   │                             DataTable, TreeView, Toast, Modal, CredentialBadge
 │   ├── forms/
-│   │   └── VaultItemForm.tsx   — dynamic create/edit form for all 10 credential types
+│   │   └── VaultItemForm.tsx   -dynamic create/edit form for all 10 credential types
 │   └── feedback/
 │       ├── EmptyState.tsx
 │       └── ErrorBoundary.tsx
 │
 ├── features/
-│   ├── landing/                — landing page + CSS
-│   ├── auth/                   — LoginPage, RegisterPage, VerifyEmailPage, ForgotPasswordPage
-│   ├── shell/                  — AppShell (sidebar + outlet), NotAuthorizedPage
-│   ├── vault/                  — VaultPage, VaultList, VaultItemDetail, SecretField
-│   ├── hierarchy/              — HierarchyPage, VaultTree
-│   ├── projects/               — ProjectsPage, ProjectDetail
-│   ├── services/               — ServicesPage, ServiceDetail
-│   ├── usage/                  — UsageDetail
-│   ├── sharing/                — InvitationFlow
-│   ├── security-center/        — SecurityCenterPage, RecoverySetup
-│   ├── audit/                  — AuditLogPage
-│   └── search/                 — GlobalSearch
+│   ├── landing/                -landing page + CSS
+│   ├── auth/                   -LoginPage, RegisterPage, VerifyEmailPage, ForgotPasswordPage
+│   ├── shell/                  -AppShell (sidebar + outlet), NotAuthorizedPage
+│   ├── vault/                  -VaultPage, VaultList, VaultItemDetail, SecretField
+│   ├── hierarchy/              -HierarchyPage, VaultTree
+│   ├── projects/               -ProjectsPage, ProjectDetail
+│   ├── services/               -ServicesPage, ServiceDetail
+│   ├── usage/                  -UsageDetail
+│   ├── sharing/                -InvitationFlow
+│   ├── security-center/        -SecurityCenterPage, RecoverySetup
+│   ├── audit/                  -AuditLogPage
+│   └── search/                 -GlobalSearch
 │
 └── styles/
-    ├── tokens.css              — all CSS custom properties (colors, spacing, typography)
-    ├── reset.css               — minimal CSS reset
-    └── utilities.css           — spacing, flex, text utility classes
+    ├── tokens.css              -all CSS custom properties (colors, spacing, typography)
+    ├── reset.css               -minimal CSS reset
+    └── utilities.css           -spacing, flex, text utility classes
 ```
 
 ---
@@ -196,7 +196,7 @@ Client request
     v
 6. Route handler
    - Business logic
-   - SQLx database queries (no compile-time checking — runtime queries for flexibility)
+   - SQLx database queries (no compile-time checking -runtime queries for flexibility)
    - Audit event insertion after successful mutations
    - Structured JSON response via ApiError or direct Json()
 ```
@@ -207,16 +207,16 @@ Client request
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
-| `REDIS_URL` | Yes | — | Redis connection string |
-| `PORT` | Yes | — | TCP port the API binds to |
-| `SESSION_SECRET` | Yes | — | Used for any future signing; presence enforced at startup |
+| `DATABASE_URL` | Yes | -| PostgreSQL connection string |
+| `REDIS_URL` | Yes | -| Redis connection string |
+| `PORT` | Yes | -| TCP port the API binds to |
+| `SESSION_SECRET` | Yes | -| Used for any future signing; presence enforced at startup |
 | `LOG_FORMAT` | No | human | `json` for structured production logs, `human` for development |
 | `APP_ENV` | No | development | `production` enables Secure cookie attribute on vault_session |
-| `SMTP_HOST` | No | — | SMTP server; if blank, verification tokens are logged via tracing |
+| `SMTP_HOST` | No | -| SMTP server; if blank, verification tokens are logged via tracing |
 | `SMTP_PORT` | No | 587 | SMTP port |
-| `SMTP_USER` | No | — | SMTP username |
-| `SMTP_PASS` | No | — | SMTP password |
+| `SMTP_USER` | No | -| SMTP username |
+| `SMTP_PASS` | No | -| SMTP password |
 | `SMTP_FROM` | No | noreply@example.com | From address for verification and reset emails |
 
 ---
@@ -224,24 +224,24 @@ Client request
 ## Docker Compose Services
 
 ```
-postgres  — postgres:16-alpine
+postgres  -postgres:16-alpine
            Health: pg_isready -U vaultnary
            Volume: postgres_data (named, persistent)
 
-redis     — redis:7-alpine
+redis     -redis:7-alpine
            Health: redis-cli ping
-           No named volume — rate limit counters are ephemeral by design
+           No named volume -rate limit counters are ephemeral by design
 
-migrate   — ghcr.io/launchbadge/sqlx-cli
+migrate   -ghcr.io/launchbadge/sqlx-cli
            Command: sqlx migrate run
            Depends on: postgres (healthy)
            Restart policy: on-failure (exits 0 on success)
 
-api       — built from deploy/Dockerfile (multi-stage Rust build)
+api       -built from deploy/Dockerfile (multi-stage Rust build)
            Depends on: migrate (completed), redis (healthy)
            Reads secrets from environment variables only
 
-web       — built from apps/web/Dockerfile (multi-stage Node/nginx build)
+web       -built from apps/web/Dockerfile (multi-stage Node/nginx build)
            Stage 1: npm run build -> dist/
            Stage 2: nginx:alpine serving dist/, proxying /api/v1/* to api:8080
            Security headers set in deploy/nginx.conf
@@ -273,7 +273,7 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 ### Vault Items (`/vault/`)
 | Method | Path | Auth | Min Role | Description |
 |--------|------|------|----------|-------------|
-| POST | /vault/items | Yes | — | Create item; validate fields + type-specific metadata |
+| POST | /vault/items | Yes | -| Create item; validate fields + type-specific metadata |
 | GET | /vault/items | Yes | Viewer | List with cursor pagination (default 20, max 100) |
 | GET | /vault/items/:id | Yes | Viewer | Get metadata; update last_accessed_at; audit |
 | PUT | /vault/items/:id | Yes | Editor | Update fields |

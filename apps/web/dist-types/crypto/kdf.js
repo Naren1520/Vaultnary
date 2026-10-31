@@ -4,7 +4,7 @@
  * Derives a 256-bit AES-256-GCM CryptoKey from a master password and salt.
  * Parameters match the backend: m=65536, t=3, p=4.
  *
- * Vite handles the argon2-browser wasm import natively — no configuration
+ * Vite handles the argon2-browser wasm import natively -no configuration
  * workarounds needed.
  */
 import argon2 from 'argon2-browser';

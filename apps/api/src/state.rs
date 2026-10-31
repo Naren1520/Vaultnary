@@ -7,7 +7,7 @@ use crate::config::Config;
 
 /// Shared application state accessible from all route handlers.
 ///
-/// Clone is cheap — all fields are wrapped in Arc or are cheaply cloneable.
+/// Clone is cheap -all fields are wrapped in Arc or are cheaply cloneable.
 #[derive(Clone)]
 pub struct AppState {
     inner: Arc<AppStateInner>,

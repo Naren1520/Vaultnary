@@ -57,7 +57,7 @@ export default function RecoverySetup() {
       try {
         privateKeyBytes = await crypto.subtle.exportKey('pkcs8', privateKey)
       } catch {
-        setError('Cannot export private key — it may not be extractable.')
+        setError('Cannot export private key -it may not be extractable.')
         return
       }
 
@@ -139,7 +139,7 @@ export default function RecoverySetup() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Choose a strong passphrase (12+ characters). Store it somewhere safe — you will need it to recover your vault if you lose access.
+            Choose a strong passphrase (12+ characters). Store it somewhere safe -you will need it to recover your vault if you lose access.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>

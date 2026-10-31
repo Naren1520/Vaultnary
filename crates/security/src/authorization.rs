@@ -1,1 +1,1 @@
-// Stub — permission checking helpers will be added in Task 17+.
+// Stub -permission checking helpers will be added in Task 17+.

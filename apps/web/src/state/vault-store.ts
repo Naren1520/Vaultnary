@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 
 interface VaultState {
-  /** Master key (AES-256-GCM CryptoKey) — in-memory only, never persisted */
+  /** Master key (AES-256-GCM CryptoKey) -in-memory only, never persisted */
   masterKey: CryptoKey | null
-  /** KEK private key (RSA-OAEP CryptoKeyPair.privateKey) — in-memory only */
+  /** KEK private key (RSA-OAEP CryptoKeyPair.privateKey) -in-memory only */
   privateKey: CryptoKey | null
   /** Whether the vault is currently unlocked */
   isUnlocked: boolean

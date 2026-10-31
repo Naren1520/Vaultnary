@@ -33,7 +33,7 @@ async function request(method, path, opts = {}) {
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: opts.signal,
     });
-    // 401 — session expired/invalid: clear state and redirect
+    // 401 -session expired/invalid: clear state and redirect
     if (response.status === 401) {
         useAuthStore.getState().clearCsrfToken();
         useVaultStore.getState().lockVault();
@@ -41,19 +41,19 @@ async function request(method, path, opts = {}) {
         // Return a promise that never resolves (we're redirecting)
         return new Promise(() => { });
     }
-    // 422 — validation errors
+    // 422 -validation errors
     if (response.status === 422) {
         const body = await response.json().catch(() => ({}));
         const details = body?.details ?? [];
         throw new ValidationError(body?.error ?? 'Validation failed', details);
     }
-    // 429 — rate limited
+    // 429 -rate limited
     if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After');
         const seconds = retryAfter ? parseInt(retryAfter, 10) : null;
         throw new RateLimitError(isNaN(seconds) ? null : seconds);
     }
-    // 5xx — server error
+    // 5xx -server error
     if (response.status >= 500) {
         throw new ServerError(response.status);
     }

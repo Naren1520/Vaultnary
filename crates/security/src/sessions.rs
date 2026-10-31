@@ -73,7 +73,7 @@ mod tests {
         let mut seen = HashSet::new();
         for _ in 0..1000 {
             let token = generate_token(128);
-            assert!(seen.insert(token), "collision detected — tokens must be unique");
+            assert!(seen.insert(token), "collision detected -tokens must be unique");
         }
     }
 

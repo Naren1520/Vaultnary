@@ -1,5 +1,5 @@
 /**
- * Vault session management — integrates the crypto module with the Zustand
+ * Vault session management -integrates the crypto module with the Zustand
  * vault-store for in-memory key lifecycle.
  *
  * Keys are ONLY held in the Zustand store (JavaScript heap memory).

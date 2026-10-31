@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn custom_always_passes() {
-        // Custom has no required fields — any metadata (including null) should pass.
+        // Custom has no required fields -any metadata (including null) should pass.
         assert!(validate_payload_metadata(&CredentialType::Custom, &json!(null)).is_ok());
         assert!(validate_payload_metadata(&CredentialType::Custom, &json!({})).is_ok());
     }

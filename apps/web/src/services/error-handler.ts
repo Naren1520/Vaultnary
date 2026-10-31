@@ -25,7 +25,7 @@ export class RateLimitError extends Error {
   }
 }
 
-/** Thrown on 5xx responses — generic message, no technical details */
+/** Thrown on 5xx responses -generic message, no technical details */
 export class ServerError extends Error {
   readonly status: number
   constructor(status: number) {

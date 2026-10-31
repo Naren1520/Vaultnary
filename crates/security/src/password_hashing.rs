@@ -33,7 +33,7 @@ pub fn hash_password(password: &str) -> Result<String, AppError> {
 /// Verify a plaintext password against a stored Argon2id PHC hash.
 ///
 /// Uses `argon2::PasswordVerifier`, which performs a constant-time comparison
-/// of the derived hash output — the timing is inherently safe.
+/// of the derived hash output -the timing is inherently safe.
 ///
 /// Returns `Ok(true)` on match, `Ok(false)` on mismatch.
 pub fn verify_password(hash: &str, candidate: &str) -> Result<bool, AppError> {

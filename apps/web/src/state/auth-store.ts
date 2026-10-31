@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 interface AuthState {
-  /** CSRF token stored in memory only — never written to localStorage/sessionStorage */
+  /** CSRF token stored in memory only -never written to localStorage/sessionStorage */
   csrfToken: string | null
   setCsrfToken: (token: string) => void
   clearCsrfToken: () => void

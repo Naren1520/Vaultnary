@@ -81,7 +81,7 @@ pub async fn setup_recovery(
     Ok(StatusCode::OK.into_response())
 }
 
-/* GET /api/v1/recovery/setup (authenticated) — returns recovery status */
+/* GET /api/v1/recovery/setup (authenticated) -returns recovery status */
 pub async fn recovery_status(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
