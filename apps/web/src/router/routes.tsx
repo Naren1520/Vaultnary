@@ -3,7 +3,7 @@ import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom'
 import { useAuthStore } from '../state/auth-store'
 import { useVaultStore } from '../state/vault-store'
 
-// Lazy-load feature pages for code splitting
+const LandingPage = lazy(() => import('../features/landing/LandingPage'))
 const LoginPage = lazy(() => import('../features/auth/LoginPage'))
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'))
 const VerifyEmailPage = lazy(() => import('../features/auth/VerifyEmailPage'))
@@ -19,21 +19,15 @@ const ServiceDetail = lazy(() => import('../features/services/ServiceDetail'))
 const SecurityCenterPage = lazy(() => import('../features/security-center/SecurityCenterPage'))
 const AuditLogPage = lazy(() => import('../features/audit/AuditLogPage'))
 
-/** Redirects to /login if no CSRF token (unauthenticated) */
 function ProtectedRoute() {
   const csrfToken = useAuthStore((s) => s.csrfToken)
-  if (!csrfToken) {
-    return <Navigate to="/login" replace />
-  }
+  if (!csrfToken) return <Navigate to="/login" replace />
   return <Outlet />
 }
 
-/** Ensures the vault is unlocked before rendering credential pages */
 function VaultUnlockGate() {
   const isUnlocked = useVaultStore((s) => s.isUnlocked)
-  if (!isUnlocked) {
-    return <Navigate to="/app/vault" replace />
-  }
+  if (!isUnlocked) return <Navigate to="/app/vault" replace />
   return <Outlet />
 }
 
@@ -45,153 +39,62 @@ function PageLoader() {
   )
 }
 
-export const router = createBrowserRouter([
-  // Public routes
-  {
-    path: '/login',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <LoginPage />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/register',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <RegisterPage />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/verify-email',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <VerifyEmailPage />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/forgot-password',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <ForgotPasswordPage />
-      </Suspense>
-    ),
-  },
+function wrap(El: React.ComponentType) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <El />
+    </Suspense>
+  )
+}
 
-  // Authenticated app routes
+export const router = createBrowserRouter([
+  // Landing page
+  { path: '/', element: wrap(LandingPage) },
+
+  // Public auth routes
+  { path: '/login', element: wrap(LoginPage) },
+  { path: '/register', element: wrap(RegisterPage) },
+  { path: '/verify-email', element: wrap(VerifyEmailPage) },
+  { path: '/forgot-password', element: wrap(ForgotPasswordPage) },
+
+  // Authenticated app
   {
     path: '/app',
     element: <ProtectedRoute />,
     children: [
       {
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <AppShell />
-          </Suspense>
-        ),
+        element: wrap(AppShell),
         children: [
           { index: true, element: <Navigate to="vault" replace /> },
 
-          // Vault - vault-unlock gate required
+          // Vault (unlock-gated)
           {
             path: 'vault',
             element: <VaultUnlockGate />,
             children: [
-              {
-                index: true,
-                element: (
-                  <Suspense fallback={<PageLoader />}>
-                    <VaultPage />
-                  </Suspense>
-                ),
-              },
-              {
-                path: ':itemId',
-                element: (
-                  <Suspense fallback={<PageLoader />}>
-                    <VaultItemDetail />
-                  </Suspense>
-                ),
-              },
+              { index: true, element: wrap(VaultPage) },
+              { path: ':itemId', element: wrap(VaultItemDetail) },
             ],
           },
 
-          // Hierarchy tree - vault-unlock gate required
+          // Hierarchy (unlock-gated)
           {
             path: 'hierarchy',
             element: <VaultUnlockGate />,
-            children: [
-              {
-                index: true,
-                element: (
-                  <Suspense fallback={<PageLoader />}>
-                    <HierarchyPage />
-                  </Suspense>
-                ),
-              },
-            ],
+            children: [{ index: true, element: wrap(HierarchyPage) }],
           },
 
-          // Projects
-          {
-            path: 'projects',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <ProjectsPage />
-              </Suspense>
-            ),
-          },
-          {
-            path: 'projects/:projectId',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <ProjectDetail />
-              </Suspense>
-            ),
-          },
-
-          // Services
-          {
-            path: 'services',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <ServicesPage />
-              </Suspense>
-            ),
-          },
-          {
-            path: 'services/:serviceId',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <ServiceDetail />
-              </Suspense>
-            ),
-          },
-
-          // Security center and audit
-          {
-            path: 'security',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <SecurityCenterPage />
-              </Suspense>
-            ),
-          },
-          {
-            path: 'audit',
-            element: (
-              <Suspense fallback={<PageLoader />}>
-                <AuditLogPage />
-              </Suspense>
-            ),
-          },
+          { path: 'projects', element: wrap(ProjectsPage) },
+          { path: 'projects/:projectId', element: wrap(ProjectDetail) },
+          { path: 'services', element: wrap(ServicesPage) },
+          { path: 'services/:serviceId', element: wrap(ServiceDetail) },
+          { path: 'security', element: wrap(SecurityCenterPage) },
+          { path: 'audit', element: wrap(AuditLogPage) },
         ],
       },
     ],
   },
 
-  // Catch-all redirect
-  { path: '*', element: <Navigate to="/login" replace /> },
+  // Catch-all
+  { path: '*', element: <Navigate to="/" replace /> },
 ])

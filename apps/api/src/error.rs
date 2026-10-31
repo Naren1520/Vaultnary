@@ -6,14 +6,12 @@ use axum::{
 use serde::Serialize;
 use shared::AppError;
 
-/// Error detail item, used for field-level validation errors.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ErrorDetail {
     pub field: String,
     pub rule: String,
 }
 
-/// Structured JSON error body returned by all error responses.
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: String,
@@ -21,29 +19,35 @@ struct ErrorBody {
     details: Vec<ErrorDetail>,
 }
 
-/// Wrapper that implements `IntoResponse` for `AppError`.
-///
-/// Maps each `AppError` variant to an appropriate HTTP status code and
-/// a `{ "error": "...", "details": [...] }` JSON body.
-/// Stack traces are never included outside of development.
-pub struct ApiError(pub AppError);
+pub struct ApiError {
+    pub inner: AppError,
+    pub details: Vec<ErrorDetail>,
+}
+
+impl ApiError {
+    pub fn new(inner: AppError) -> Self {
+        Self { inner, details: vec![] }
+    }
+
+    pub fn with_details(inner: AppError, details: Vec<ErrorDetail>) -> Self {
+        Self { inner, details }
+    }
+}
 
 impl From<AppError> for ApiError {
     fn from(e: AppError) -> Self {
-        Self(e)
+        Self::new(e)
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let (status, message) = match &self.0 {
+        let (status, message) = match &self.inner {
             AppError::NotFound => (StatusCode::NOT_FOUND, "Not found".to_string()),
             AppError::Forbidden => (StatusCode::FORBIDDEN, "Forbidden".to_string()),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
-            AppError::UnprocessableEntity(msg) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, msg.clone())
-            }
+            AppError::UnprocessableEntity(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             AppError::RateLimited => (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -55,18 +59,18 @@ impl IntoResponse for ApiError {
             ),
             AppError::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                // Never expose internal error details outside development
                 "An unexpected error occurred.".to_string(),
             ),
         };
 
-        let body = ErrorBody {
-            error: message,
-            details: vec![],
-        };
-
-        (status, Json(body)).into_response()
+        (status, Json(ErrorBody { error: message, details: self.details })).into_response()
     }
 }
 
-
+/// Convenience: create a 422 with field-level details
+pub fn unprocessable(field: &str, rule: &str) -> ApiError {
+    ApiError::with_details(
+        AppError::UnprocessableEntity(format!("{field}: {rule}")),
+        vec![ErrorDetail { field: field.to_string(), rule: rule.to_string() }],
+    )
+}

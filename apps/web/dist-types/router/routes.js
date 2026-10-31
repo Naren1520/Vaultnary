@@ -3,7 +3,7 @@ import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
 import { useAuthStore } from '../state/auth-store';
 import { useVaultStore } from '../state/vault-store';
-// Lazy-load feature pages for code splitting
+const LandingPage = lazy(() => import('../features/landing/LandingPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('../features/auth/VerifyEmailPage'));
@@ -18,109 +18,66 @@ const ServicesPage = lazy(() => import('../features/services/ServicesPage'));
 const ServiceDetail = lazy(() => import('../features/services/ServiceDetail'));
 const SecurityCenterPage = lazy(() => import('../features/security-center/SecurityCenterPage'));
 const AuditLogPage = lazy(() => import('../features/audit/AuditLogPage'));
-/** Redirects to /login if no CSRF token (unauthenticated) */
 function ProtectedRoute() {
     const csrfToken = useAuthStore((s) => s.csrfToken);
-    if (!csrfToken) {
+    if (!csrfToken)
         return _jsx(Navigate, { to: "/login", replace: true });
-    }
     return _jsx(Outlet, {});
 }
-/** Ensures the vault is unlocked before rendering credential pages */
 function VaultUnlockGate() {
     const isUnlocked = useVaultStore((s) => s.isUnlocked);
-    if (!isUnlocked) {
+    if (!isUnlocked)
         return _jsx(Navigate, { to: "/app/vault", replace: true });
-    }
     return _jsx(Outlet, {});
 }
 function PageLoader() {
     return (_jsx("div", { role: "status", "aria-label": "Loading page", style: { padding: '2rem', textAlign: 'center' }, children: "Loading..." }));
 }
+function wrap(El) {
+    return (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(El, {}) }));
+}
 export const router = createBrowserRouter([
-    // Public routes
-    {
-        path: '/login',
-        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(LoginPage, {}) })),
-    },
-    {
-        path: '/register',
-        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(RegisterPage, {}) })),
-    },
-    {
-        path: '/verify-email',
-        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(VerifyEmailPage, {}) })),
-    },
-    {
-        path: '/forgot-password',
-        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(ForgotPasswordPage, {}) })),
-    },
-    // Authenticated app routes
+    // Landing page
+    { path: '/', element: wrap(LandingPage) },
+    // Public auth routes
+    { path: '/login', element: wrap(LoginPage) },
+    { path: '/register', element: wrap(RegisterPage) },
+    { path: '/verify-email', element: wrap(VerifyEmailPage) },
+    { path: '/forgot-password', element: wrap(ForgotPasswordPage) },
+    // Authenticated app
     {
         path: '/app',
         element: _jsx(ProtectedRoute, {}),
         children: [
             {
-                element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(AppShell, {}) })),
+                element: wrap(AppShell),
                 children: [
                     { index: true, element: _jsx(Navigate, { to: "vault", replace: true }) },
-                    // Vault - vault-unlock gate required
+                    // Vault (unlock-gated)
                     {
                         path: 'vault',
                         element: _jsx(VaultUnlockGate, {}),
                         children: [
-                            {
-                                index: true,
-                                element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(VaultPage, {}) })),
-                            },
-                            {
-                                path: ':itemId',
-                                element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(VaultItemDetail, {}) })),
-                            },
+                            { index: true, element: wrap(VaultPage) },
+                            { path: ':itemId', element: wrap(VaultItemDetail) },
                         ],
                     },
-                    // Hierarchy tree - vault-unlock gate required
+                    // Hierarchy (unlock-gated)
                     {
                         path: 'hierarchy',
                         element: _jsx(VaultUnlockGate, {}),
-                        children: [
-                            {
-                                index: true,
-                                element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(HierarchyPage, {}) })),
-                            },
-                        ],
+                        children: [{ index: true, element: wrap(HierarchyPage) }],
                     },
-                    // Projects
-                    {
-                        path: 'projects',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(ProjectsPage, {}) })),
-                    },
-                    {
-                        path: 'projects/:projectId',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(ProjectDetail, {}) })),
-                    },
-                    // Services
-                    {
-                        path: 'services',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(ServicesPage, {}) })),
-                    },
-                    {
-                        path: 'services/:serviceId',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(ServiceDetail, {}) })),
-                    },
-                    // Security center and audit
-                    {
-                        path: 'security',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(SecurityCenterPage, {}) })),
-                    },
-                    {
-                        path: 'audit',
-                        element: (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(AuditLogPage, {}) })),
-                    },
+                    { path: 'projects', element: wrap(ProjectsPage) },
+                    { path: 'projects/:projectId', element: wrap(ProjectDetail) },
+                    { path: 'services', element: wrap(ServicesPage) },
+                    { path: 'services/:serviceId', element: wrap(ServiceDetail) },
+                    { path: 'security', element: wrap(SecurityCenterPage) },
+                    { path: 'audit', element: wrap(AuditLogPage) },
                 ],
             },
         ],
     },
-    // Catch-all redirect
-    { path: '*', element: _jsx(Navigate, { to: "/login", replace: true }) },
+    // Catch-all
+    { path: '*', element: _jsx(Navigate, { to: "/", replace: true }) },
 ]);

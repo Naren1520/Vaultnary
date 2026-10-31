@@ -41,8 +41,10 @@ fn v1_routes() -> Router<AppState> {
         .route("/auth/sessions", delete(auth::revoke_all_sessions))
         .route("/auth/sessions/:session_id", delete(auth::revoke_session))
         // Recovery
-        .route("/auth/recover", post(auth::recover))
+        .route("/auth/recover", post(recovery::recover))
         // --- Users ---
+        .route("/users/me", get(users::get_me))
+        .route("/users/lookup", get(users::lookup_user))
         .route("/users/:user_id", get(users::get_user))
         // --- Vault Items ---
         .route("/vault/items", post(vaults::create_item))
@@ -90,6 +92,12 @@ fn v1_routes() -> Router<AppState> {
         )
         // --- Sessions (security center alias) ---
         .route("/security/sessions", get(sessions::list_sessions))
+        .route("/security/events", get(sessions::security_events))
+        .route("/security/invitations", get(sessions::security_invitations))
+        .route("/security/shared-with-me", get(sessions::shared_with_me))
+        // --- Recovery ---
+        .route("/recovery/setup", post(recovery::setup_recovery))
+        .route("/recovery/setup", get(recovery::recovery_status))
         // --- Audit ---
         .route("/audit/events", get(audit::list_events))
 }
