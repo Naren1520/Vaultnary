@@ -15,6 +15,10 @@ import { ValidationError, RateLimitError, ServerError } from './error-handler'
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
+// In production this is set to the Render API URL (e.g. https://vaultnary-api.onrender.com)
+// In development it is empty and Vite's dev proxy handles /api/v1/* -> localhost:8080
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+
 interface RequestOptions {
   /** Additional headers to merge */
   headers?: Record<string, string>
@@ -40,7 +44,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     }
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
     credentials: 'include', // include vault_session cookie

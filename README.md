@@ -156,37 +156,6 @@ cd apps/web && npm run test
 
 ---
 
-## Production Deployment
-
-```bash
-export SESSION_SECRET=$(openssl rand -hex 32)
-docker compose -f deploy/compose.yaml up --build -d
-```
-
-Services: PostgreSQL, Redis, migration runner (one-shot), API server, nginx (frontend + proxy).
-
-For TLS termination see [deploy/reverse-proxy/README.md](deploy/reverse-proxy/README.md).
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL URL: `postgres://user:pass@host:port/dbname` |
-| `REDIS_URL` | Yes | Redis URL: `redis://host:port` |
-| `PORT` | Yes | API listen port |
-| `SESSION_SECRET` | Yes | Random secret — `openssl rand -hex 32` |
-| `LOG_FORMAT` | No | `json` (production) or `human` (development) |
-| `APP_ENV` | No | `production` enables `Secure` cookie attribute |
-| `SMTP_HOST` | No | SMTP server — if empty, tokens are logged via tracing |
-| `SMTP_PORT` | No | SMTP port (default 587) |
-| `SMTP_USER` | No | SMTP username |
-| `SMTP_PASS` | No | SMTP password |
-| `SMTP_FROM` | No | From address for emails |
-
----
-
 ## Documentation
 
 | Document | Contents |
@@ -198,19 +167,6 @@ For TLS termination see [deploy/reverse-proxy/README.md](deploy/reverse-proxy/RE
 | [Threat Model](docs/threat-model.md) | Assets, trust boundaries, 12 threat scenarios and mitigations |
 | [Recovery Design](docs/recovery-design.md) | Setup flow, recovery procedure, security analysis |
 
----
-
-## Implementation Status
-
-| Phase | Tasks | Status |
-|-------|-------|--------|
-| 1 — Foundation | 1-9 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 2 — Authentication | 10-16 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 3 — Vault + Crypto | 17-23 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 4 — Hierarchy + Projects | 24-29 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 5 — Sharing | 30-33 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 6 — Recovery + Security Center | 34-36 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
-| 7 — Polish + Deployment | 37-41 | ![done](https://img.shields.io/badge/status-complete-22c55e?style=flat-square) |
 
 ---
 
@@ -222,9 +178,25 @@ For TLS termination see [deploy/reverse-proxy/README.md](deploy/reverse-proxy/RE
 [![LinkedIn](https://img.shields.io/badge/narensj20-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://linkedin.com/in/narensj20)
 [![Portfolio](https://img.shields.io/badge/narensj.netlify.app-000000?style=flat&logo=netlify&logoColor=white)](https://narensj.netlify.app)
 [![GitHub](https://img.shields.io/badge/Naren1520-181717?style=flat&logo=github&logoColor=white)](https://github.com/Naren1520)
+---
+
+## Security
+
+Security vulnerabilities must be reported privately — do **not** open a public issue.
+See [SECURITY.md](SECURITY.md) for the responsible disclosure process.
+
+Dependency scanning runs on every pull request:
+- `cargo audit` — Rust dependency CVE scan
+- `npm audit --audit-level=high` — Node dependency scan
 
 ---
 
 ## License
 
-MIT
+Copyright (c) 2026 Naren S J. All rights reserved.
+
+This software is **proprietary and not open source**. Viewing the source code
+does not grant any rights to use, copy, modify, deploy, or distribute it.
+See [LICENSE](LICENSE) for full terms.
+
+Licensing enquiries: [narensonu1520@gmail.com](mailto:narensonu1520@gmail.com)

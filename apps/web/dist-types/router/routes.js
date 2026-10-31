@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
 import { useAuthStore } from '../state/auth-store';
 import { useVaultStore } from '../state/vault-store';
+import Loader from '../components/ui/Loader';
 const LandingPage = lazy(() => import('../features/landing/LandingPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
@@ -31,7 +32,13 @@ function VaultUnlockGate() {
     return _jsx(Outlet, {});
 }
 function PageLoader() {
-    return (_jsx("div", { role: "status", "aria-label": "Loading page", style: { padding: '2rem', textAlign: 'center' }, children: "Loading..." }));
+    return (_jsx("div", { role: "status", "aria-label": "Loading page", style: {
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--color-bg)',
+        }, children: _jsx(Loader, { size: 72 }) }));
 }
 function wrap(El) {
     return (_jsx(Suspense, { fallback: _jsx(PageLoader, {}), children: _jsx(El, {}) }));

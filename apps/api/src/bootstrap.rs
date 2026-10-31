@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use fred::{clients::RedisPool, interfaces::ClientLike, types::RedisConfig};
 use sqlx::postgres::PgPoolOptions;
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -49,9 +50,32 @@ pub async fn run() -> anyhow::Result<()> {
 
     let state = AppState::new(db.clone(), redis.clone(), config.clone());
 
-    // Middleware layers (applied outermost-first via .layer())
-    // Axum applies layers from outermost (first .layer() call) to innermost.
-    // Execution order: request_id -> tracing -> rate_limiter -> auth_session -> csrf_guard
+    // CORS: allow requests from the Vercel frontend
+    // Set CORS_ORIGIN env var to your Vercel URL, e.g. https://vaultnary.vercel.app
+    let cors_origin = std::env::var("CORS_ORIGIN")
+        .unwrap_or_else(|_| "http://localhost:5173".to_string());
+
+    let cors = CorsLayer::new()
+        .allow_origin(
+            cors_origin
+                .parse::<axum::http::HeaderValue>()
+                .expect("invalid CORS_ORIGIN"),
+        )
+        .allow_methods(AllowMethods::list([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::PATCH,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ]))
+        .allow_headers(AllowHeaders::list([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+            axum::http::HeaderName::from_static("x-csrf-token"),
+        ]))
+        .allow_credentials(true);
+
     let app = api_router()
         // csrf_guard - innermost, runs last; requires AuthUser to be populated
         .layer(CsrfGuardLayer)
@@ -69,6 +93,8 @@ pub async fn run() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         // request_id - outermost, assigns X-Request-Id first
         .layer(RequestIdLayer)
+        // cors - must be outermost so OPTIONS preflight requests are handled before auth
+        .layer(cors)
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));

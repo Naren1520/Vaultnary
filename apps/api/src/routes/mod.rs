@@ -100,4 +100,6 @@ fn v1_routes() -> Router<AppState> {
         .route("/recovery/setup", get(recovery::recovery_status))
         // --- Audit ---
         .route("/audit/events", get(audit::list_events))
+        // --- Health check (used by Render) ---
+        .route("/health", get(|| async { "ok" }))
 }
