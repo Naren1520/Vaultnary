@@ -1,0 +1,85 @@
+name: vaultnary
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vaultnary
+      POSTGRES_USER: vaultnary
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vaultnary -d vaultnary"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  # Redis (ephemeral - rate limit data is not persisted)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  # Migrations (one-shot, runs then exits)
+  migrate:
+    image: ghcr.io/launchbadge/sqlx-cli:latest
+    command: sqlx migrate run
+    environment:
+      DATABASE_URL: postgres://vaultnary:changeme@postgres:5432/vaultnary
+    volumes:
+      - ../migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  # API
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://vaultnary:changeme@postgres:5432/vaultnary
+      REDIS_URL: redis://redis:6379
+      PORT: "8080"
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
+      LOG_FORMAT: json
+      APP_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  # Web (nginx serving Vite static build + API proxy)
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:

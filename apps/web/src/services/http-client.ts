@@ -1,0 +1,116 @@
+/**
+ * Typed HTTP client wrappers around fetch.
+ *
+ * - CSRF token is read from the Zustand auth-store (in-memory only)
+ *   and injected as X-CSRF-Token on all POST/PUT/PATCH/DELETE calls.
+ * - 401 → clear CSRF token, lock vault, redirect to /login
+ * - 422 → parse field errors, throw ValidationError
+ * - 429 → parse Retry-After, throw RateLimitError
+ * - 5xx → throw ServerError (generic message, no stack trace)
+ */
+
+import { useAuthStore } from '../state/auth-store'
+import { useVaultStore } from '../state/vault-store'
+import { ValidationError, RateLimitError, ServerError } from './error-handler'
+
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+interface RequestOptions {
+  /** Additional headers to merge */
+  headers?: Record<string, string>
+  /** Request body — serialised to JSON automatically */
+  body?: unknown
+  /** AbortSignal for cancellation */
+  signal?: AbortSignal
+}
+
+/** Low-level fetch wrapper that handles auth, CSRF, and error mapping */
+async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...opts.headers,
+  }
+
+  // Inject CSRF token on mutating requests
+  if (MUTATING_METHODS.has(method.toUpperCase())) {
+    const csrfToken = useAuthStore.getState().csrfToken
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
+  }
+
+  const response = await fetch(path, {
+    method,
+    headers,
+    credentials: 'include', // include vault_session cookie
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    signal: opts.signal,
+  })
+
+  // 401 — session expired/invalid: clear state and redirect
+  if (response.status === 401) {
+    useAuthStore.getState().clearCsrfToken()
+    useVaultStore.getState().lockVault()
+    window.location.replace('/login')
+    // Return a promise that never resolves (we're redirecting)
+    return new Promise(() => {})
+  }
+
+  // 422 — validation errors
+  if (response.status === 422) {
+    const body = await response.json().catch(() => ({}))
+    const details: Array<{ field: string; rule: string }> = body?.details ?? []
+    throw new ValidationError(body?.error ?? 'Validation failed', details)
+  }
+
+  // 429 — rate limited
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After')
+    const seconds = retryAfter ? parseInt(retryAfter, 10) : null
+    throw new RateLimitError(isNaN(seconds as number) ? null : seconds)
+  }
+
+  // 5xx — server error
+  if (response.status >= 500) {
+    throw new ServerError(response.status)
+  }
+
+  // Non-2xx (other)
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(body?.error ?? `Request failed with status ${response.status}`)
+  }
+
+  // 204 No Content
+  if (response.status === 204) {
+    return undefined as unknown as T
+  }
+
+  return response.json() as Promise<T>
+}
+
+/** GET /path */
+export function apiGet<T>(path: string, opts?: Pick<RequestOptions, 'signal' | 'headers'>): Promise<T> {
+  return request<T>('GET', path, opts)
+}
+
+/** POST /path with JSON body */
+export function apiPost<T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'signal' | 'headers'>): Promise<T> {
+  return request<T>('POST', path, { ...opts, body })
+}
+
+/** PUT /path with JSON body */
+export function apiPut<T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'signal' | 'headers'>): Promise<T> {
+  return request<T>('PUT', path, { ...opts, body })
+}
+
+/** PATCH /path with JSON body */
+export function apiPatch<T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'signal' | 'headers'>): Promise<T> {
+  return request<T>('PATCH', path, { ...opts, body })
+}
+
+/** DELETE /path with optional JSON body */
+export function apiDelete<T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'signal' | 'headers'>): Promise<T> {
+  return request<T>('DELETE', path, { ...opts, body })
+}

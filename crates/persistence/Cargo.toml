@@ -1,0 +1,11 @@
+[package]
+name = "persistence"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }
+shared = { path = "../shared" }
+domain = { path = "../domain" }
