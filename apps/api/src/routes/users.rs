@@ -88,3 +88,61 @@ pub async fn lookup_user(
     let (id,) = row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
     Ok(Json(serde_json::json!({ "data": { "id": id } })))
 }
+
+/// POST /api/v1/dev/verify-email — dev only, force-verifies an email
+pub async fn dev_verify_email(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    if !state.config().is_development() {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let db = state.db();
+    let result = sqlx::query(
+        "UPDATE users SET email_verified = true WHERE email = $1",
+    )
+    .bind(&email)
+    .execute(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    Ok(axum::Json(serde_json::json!({ "ok": true, "email": email })))
+}
+
+/// POST /api/v1/dev/reset-password — dev only, reset password directly
+pub async fn dev_reset_password(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    if !state.config().is_development() {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let password = body.get("password").and_then(|v| v.as_str()).unwrap_or("");
+
+    if email.is_empty() || password.len() < 12 {
+        return Err(ApiError::new(AppError::BadRequest("email and password (12+ chars) required".into())));
+    }
+
+    let hash = security::password_hashing::hash_password(password)
+        .map_err(|e| ApiError::new(e))?;
+
+    let db = state.db();
+    let result = sqlx::query(
+        "UPDATE users SET password_hash = $1, email_verified = true WHERE email = $2",
+    )
+    .bind(&hash)
+    .bind(&email)
+    .execute(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    Ok(axum::Json(serde_json::json!({ "ok": true, "email": email, "message": "password updated and email verified" })))
+}

@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 
-use fred::{clients::RedisPool, interfaces::ClientLike, types::RedisConfig};
 use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -12,46 +11,27 @@ use crate::{
     middleware::{
         auth::AuthSessionLayer,
         csrf::CsrfGuardLayer,
-        rate_limit::{RateLimitConfig, RateLimitLayer},
+        rate_limit::{InMemoryStore, RateLimitConfig, RateLimitLayer},
         request_id::RequestIdLayer,
     },
     routes::api_router,
     state::AppState,
 };
 
-/// Entry point called by `main.rs`.
-///
-/// Middleware order (outermost to innermost):
-///   request_id -> tracing -> rate_limiter -> auth_session -> csrf_guard
 pub async fn run() -> anyhow::Result<()> {
     let config = Config::from_env();
-
     init_tracing(&config);
 
-    info!(
-        port = config.port,
-        app_env = ?config.app_env,
-        "Starting Vaultnary API"
-    );
+    info!(port = config.port, app_env = ?config.app_env, "Starting Vaultnary API");
 
-    // Postgres
     let db = PgPoolOptions::new()
         .max_connections(20)
         .connect(&config.database_url)
         .await?;
     info!("Connected to PostgreSQL");
 
-    // Redis
-    let redis_config = RedisConfig::from_url(&config.redis_url)?;
-    let redis = RedisPool::new(redis_config, None, None, None, 6)?;
-    redis.connect();
-    redis.wait_for_connect().await?;
-    info!("Connected to Redis");
+    let state = AppState::new(db.clone(), config.clone());
 
-    let state = AppState::new(db.clone(), redis.clone(), config.clone());
-
-    // CORS: allow requests from the Vercel frontend
-    // Set CORS_ORIGIN env var to your Vercel URL, e.g. https://vaultnary.vercel.app
     let cors_origin = std::env::var("CORS_ORIGIN")
         .unwrap_or_else(|_| "http://localhost:5173".to_string());
 
@@ -76,24 +56,20 @@ pub async fn run() -> anyhow::Result<()> {
         ]))
         .allow_credentials(true);
 
+    let rate_store = InMemoryStore::new();
+
     let app = api_router()
-        // csrf_guard - innermost, runs last; requires AuthUser to be populated
         .layer(CsrfGuardLayer)
-        // auth_session - populates AuthUser extension
         .layer(AuthSessionLayer::new(db))
-        // rate_limiter - global IP-based rate limit (per-route limits applied separately)
         .layer(RateLimitLayer::new(
-            redis,
+            rate_store,
             RateLimitConfig {
                 window: std::time::Duration::from_secs(60),
                 max_requests: 200,
             },
         ))
-        // tracing - structured request/response spans
         .layer(TraceLayer::new_for_http())
-        // request_id - outermost, assigns X-Request-Id first
         .layer(RequestIdLayer)
-        // cors - must be outermost so OPTIONS preflight requests are handled before auth
         .layer(cors)
         .with_state(state);
 
@@ -106,8 +82,6 @@ pub async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Initialise the global tracing subscriber.
-/// JSON format when LOG_FORMAT=json, human-readable otherwise.
 fn init_tracing(config: &Config) {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));

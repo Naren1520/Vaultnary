@@ -200,14 +200,15 @@ pub async fn register(
     let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query(
-        "INSERT INTO users (id, email, password_hash, email_verify_token_hash, email_verify_token_expires_at)
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO users (id, email, password_hash, email_verify_token_hash, email_verify_token_expires_at, email_verified)
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(user_id)
     .bind(&email)
     .bind(&password_hash)
     .bind(&verify_token_hash)
     .bind(expires_at)
+    .bind(state.config().is_development()) // auto-verify in development
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -224,8 +225,10 @@ pub async fn register(
     let ip = extract_ip(&headers).or_else(|| Some(addr.ip().to_string()));
     insert_audit(db, user_id, "user.registered", None, None, ip, serde_json::json!({})).await;
 
-    // Log token if SMTP not configured (development)
-    tracing::info!(user_id = %user_id, "email verification token generated (not logged for security)");
+    // Send verification email via Resend (logs token if key not configured)
+    let frontend_url = std::env::var("FRONTEND_URL")
+        .unwrap_or_else(|_| "http://localhost:5173".to_string());
+    crate::email::send_verification_email(&email, &verify_token, &frontend_url).await;
 
     Ok(StatusCode::OK.into_response())
 }
@@ -314,6 +317,9 @@ pub async fn resend_verification(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
         tracing::info!(user_id = %user_id, "resend verification token generated");
+        let frontend_url = std::env::var("FRONTEND_URL")
+            .unwrap_or_else(|_| "http://localhost:5173".to_string());
+        crate::email::send_verification_email(&email, &verify_token, &frontend_url).await;
     }
 
     Ok(StatusCode::OK.into_response())
@@ -647,6 +653,9 @@ pub async fn forgot_password(
             .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
             tracing::info!(user_id = %user_id, "password reset token generated");
+            let frontend_url = std::env::var("FRONTEND_URL")
+                .unwrap_or_else(|_| "http://localhost:5173".to_string());
+            crate::email::send_password_reset_email(&email, &reset_token, &frontend_url).await;
         }
         None => {
             // Dummy hash to equalize timing regardless of account existence

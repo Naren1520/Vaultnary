@@ -91,7 +91,19 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     return undefined as unknown as T
   }
 
-  return response.json() as Promise<T>
+  // Handle empty body responses (200 OK with no JSON body)
+  const contentType = response.headers.get('content-type') ?? ''
+  const contentLength = response.headers.get('content-length')
+  if (!contentType.includes('application/json') || contentLength === '0') {
+    return undefined as unknown as T
+  }
+
+  const text = await response.text()
+  if (!text || text.trim() === '') {
+    return undefined as unknown as T
+  }
+
+  return JSON.parse(text) as T
 }
 
 /** GET /path */

@@ -102,4 +102,7 @@ fn v1_routes() -> Router<AppState> {
         .route("/audit/events", get(audit::list_events))
         // --- Health check (used by Render) ---
         .route("/health", get(|| async { "ok" }))
+        // --- Dev utilities (development only) ---
+        .route("/dev/verify-email", post(users::dev_verify_email))
+        .route("/dev/reset-password", post(users::dev_reset_password))
 }
