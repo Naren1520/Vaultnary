@@ -213,7 +213,7 @@ pub async fn create_item(
     .bind(&name)
     .bind(ctype_str)
     .bind(parent_item_id)
-    .bind(serde_json::to_value(&tags).unwrap_or(serde_json::json!([])))
+    .bind(&tags as &[String])
     .bind(encrypted_payload)
     .bind(payload_metadata)
     .bind(notes)
@@ -298,12 +298,7 @@ pub async fn list_items(
 
     /* Rows: (id, name, ctype, parent_item_id, tags JSON, notes, is_favorite,
              last_accessed_at, created_at, updated_at) */
-    type ItemRow = (
-        Uuid,
-        String,
-        String,
-        Option<Uuid>,
-        serde_json::Value,
+    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
         Option<String>,
         bool,
         Option<OffsetDateTime>,
@@ -357,7 +352,7 @@ pub async fn list_items(
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
         .map(|(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
-            let tags = extract_tags(&tags_val);
+            let tags = tags_val;
             VaultItemMeta {
                 id,
                 name,
@@ -430,12 +425,7 @@ pub async fn get_item(
         None
     };
 
-    type ItemRow = (
-        Uuid,
-        String,
-        String,
-        Option<Uuid>,
-        serde_json::Value,
+    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
         Option<String>,
         bool,
         Option<OffsetDateTime>,
@@ -478,7 +468,7 @@ pub async fn get_item(
     )
     .await;
 
-    let tags = extract_tags(&tags_val);
+    let tags = tags_val;
     let meta = VaultItemMeta {
         id,
         name,
@@ -554,7 +544,7 @@ pub async fn update_item(
     )
     .bind(&name)
     .bind(ctype_str)
-    .bind(serde_json::to_value(&tags).unwrap_or(serde_json::json!([])))
+    .bind(&tags as &[String])
     .bind(encrypted_payload)
     .bind(payload_metadata)
     .bind(notes)
@@ -701,7 +691,7 @@ pub async fn search_items(
     let pattern = format!("%{q}%");
 
     /* Search by name (ILIKE) or notes, and also check tags array contains the query */
-    type SearchRow = (Uuid, String, String, serde_json::Value);
+    type SearchRow = (Uuid, String, String, Vec<String>);
     let rows: Vec<SearchRow> = sqlx::query_as(
         "SELECT vi.id, vi.name, vi.credential_type, vi.tags
          FROM vault_items vi
@@ -735,7 +725,7 @@ pub async fn search_items(
             id,
             name,
             credential_type: ctype,
-            tags: extract_tags(&tags_val),
+            tags: tags_val,
         })
         .collect();
 
@@ -750,12 +740,7 @@ pub async fn list_favorites(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type ItemRow = (
-        Uuid,
-        String,
-        String,
-        Option<Uuid>,
-        serde_json::Value,
+    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
         Option<String>,
         Option<OffsetDateTime>,
         OffsetDateTime,
@@ -783,7 +768,7 @@ pub async fn list_favorites(
                 name,
                 credential_type: ctype,
                 parent_item_id: parent_id,
-                tags: extract_tags(&tags_val),
+                tags: tags_val,
                 notes,
                 is_favorite: true,
                 last_accessed_at: last_acc.map(|t| t.to_string()),
@@ -882,12 +867,7 @@ pub async fn recent_items(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type ItemRow = (
-        Uuid,
-        String,
-        String,
-        Option<Uuid>,
-        serde_json::Value,
+    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
         Option<String>,
         bool,
         Option<OffsetDateTime>,
@@ -918,7 +898,7 @@ pub async fn recent_items(
                 name,
                 credential_type: ctype,
                 parent_item_id: parent_id,
-                tags: extract_tags(&tags_val),
+                tags: tags_val,
                 notes,
                 is_favorite: is_fav,
                 last_accessed_at: last_acc.map(|t| t.to_string()),
