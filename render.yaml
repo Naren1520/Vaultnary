@@ -11,11 +11,6 @@ services:
         fromDatabase:
           name: vaultnary-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: vaultnary-redis
-          type: redis
-          property: connectionString
       - key: PORT
         value: "10000"
       - key: APP_ENV
@@ -26,23 +21,15 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         sync: false
-      - key: SMTP_HOST
+      - key: FRONTEND_URL
         sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
+      - key: RESEND_API_KEY
         sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
-        value: noreply@vaultnary.app
+      - key: EMAIL_FROM
+        value: "Vaultnary <noreply@vaultnary.app>"
 
 databases:
   - name: vaultnary-db
     databaseName: vaultnary
     user: vaultnary
     plan: free
-
-  - name: vaultnary-redis
-    plan: free
-    type: redis
