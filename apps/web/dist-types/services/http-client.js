@@ -69,12 +69,7 @@ async function request(method, path, opts = {}) {
     if (response.status === 204) {
         return undefined;
     }
-    // Handle empty body responses (200 OK with no JSON body)
-    const contentType = response.headers.get('content-type') ?? '';
-    const contentLength = response.headers.get('content-length');
-    if (!contentType.includes('application/json') || contentLength === '0') {
-        return undefined;
-    }
+    // Try to parse as JSON; return undefined if body is empty
     const text = await response.text();
     if (!text || text.trim() === '') {
         return undefined;

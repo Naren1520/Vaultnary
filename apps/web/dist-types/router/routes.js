@@ -2,7 +2,6 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
 import { useAuthStore } from '../state/auth-store';
-import { useVaultStore } from '../state/vault-store';
 import Loader from '../components/ui/Loader';
 const LandingPage = lazy(() => import('../features/landing/LandingPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
@@ -23,12 +22,6 @@ function ProtectedRoute() {
     const csrfToken = useAuthStore((s) => s.csrfToken);
     if (!csrfToken)
         return _jsx(Navigate, { to: "/login", replace: true });
-    return _jsx(Outlet, {});
-}
-function VaultUnlockGate() {
-    const isUnlocked = useVaultStore((s) => s.isUnlocked);
-    if (!isUnlocked)
-        return _jsx(Navigate, { to: "/app/vault", replace: true });
     return _jsx(Outlet, {});
 }
 function PageLoader() {
@@ -60,21 +53,11 @@ export const router = createBrowserRouter([
                 element: wrap(AppShell),
                 children: [
                     { index: true, element: _jsx(Navigate, { to: "vault", replace: true }) },
-                    // Vault (unlock-gated)
-                    {
-                        path: 'vault',
-                        element: _jsx(VaultUnlockGate, {}),
-                        children: [
-                            { index: true, element: wrap(VaultPage) },
-                            { path: ':itemId', element: wrap(VaultItemDetail) },
-                        ],
-                    },
-                    // Hierarchy (unlock-gated)
-                    {
-                        path: 'hierarchy',
-                        element: _jsx(VaultUnlockGate, {}),
-                        children: [{ index: true, element: wrap(HierarchyPage) }],
-                    },
+                    // Vault
+                    { path: 'vault', element: wrap(VaultPage) },
+                    { path: 'vault/:itemId', element: wrap(VaultItemDetail) },
+                    // Hierarchy
+                    { path: 'hierarchy', element: wrap(HierarchyPage) },
                     { path: 'projects', element: wrap(ProjectsPage) },
                     { path: 'projects/:projectId', element: wrap(ProjectDetail) },
                     { path: 'services', element: wrap(ServicesPage) },

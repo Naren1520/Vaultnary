@@ -55,6 +55,22 @@ where
                 return inner.call(req).await;
             }
 
+            // Public auth endpoints never require CSRF — they create or reset sessions.
+            let path = req.uri().path();
+            let public_paths = [
+                "/api/v1/auth/login",
+                "/api/v1/auth/register",
+                "/api/v1/auth/forgot-password",
+                "/api/v1/auth/reset-password",
+                "/api/v1/auth/resend-verification",
+                "/api/v1/auth/recover",
+                "/api/v1/dev/verify-email",
+                "/api/v1/dev/reset-password",
+            ];
+            if public_paths.contains(&path) {
+                return inner.call(req).await;
+            }
+
             // If there is no AuthUser extension the request is unauthenticated —
             // let auth middleware handle it.
             let auth_user = match req.extensions().get::<AuthUser>() {

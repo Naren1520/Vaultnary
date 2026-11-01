@@ -7,7 +7,6 @@ export default defineConfig({
     alias: { '@': '/src' },
   },
   server: {
-    // Dev only: proxy /api/v1/* to local Rust backend
     proxy: {
       '/api/v1': {
         target: process.env.VITE_API_BASE_URL || 'http://localhost:8080',

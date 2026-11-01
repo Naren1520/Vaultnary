@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom'
 import { useAuthStore } from '../state/auth-store'
-import { useVaultStore } from '../state/vault-store'
 import Loader from '../components/ui/Loader'
 
 const LandingPage = lazy(() => import('../features/landing/LandingPage'))
@@ -23,12 +22,6 @@ const AuditLogPage = lazy(() => import('../features/audit/AuditLogPage'))
 function ProtectedRoute() {
   const csrfToken = useAuthStore((s) => s.csrfToken)
   if (!csrfToken) return <Navigate to="/login" replace />
-  return <Outlet />
-}
-
-function VaultUnlockGate() {
-  const isUnlocked = useVaultStore((s) => s.isUnlocked)
-  if (!isUnlocked) return <Navigate to="/app/vault" replace />
   return <Outlet />
 }
 
@@ -78,22 +71,12 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="vault" replace /> },
 
-          // Vault (unlock-gated)
-          {
-            path: 'vault',
-            element: <VaultUnlockGate />,
-            children: [
-              { index: true, element: wrap(VaultPage) },
-              { path: ':itemId', element: wrap(VaultItemDetail) },
-            ],
-          },
+          // Vault
+          { path: 'vault', element: wrap(VaultPage) },
+          { path: 'vault/:itemId', element: wrap(VaultItemDetail) },
 
-          // Hierarchy (unlock-gated)
-          {
-            path: 'hierarchy',
-            element: <VaultUnlockGate />,
-            children: [{ index: true, element: wrap(HierarchyPage) }],
-          },
+          // Hierarchy
+          { path: 'hierarchy', element: wrap(HierarchyPage) },
 
           { path: 'projects', element: wrap(ProjectsPage) },
           { path: 'projects/:projectId', element: wrap(ProjectDetail) },
