@@ -29,7 +29,7 @@ export default class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown) {
     // Log to console in development only -never expose to the user
-    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('[ErrorBoundary]', error)
     }
   }
