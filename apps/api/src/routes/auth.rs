@@ -191,6 +191,7 @@ pub async fn register(
         .map_err(|e| ApiError::new(e))?;
 
     let user_id = Uuid::new_v4();
+    let workspace_id = Uuid::new_v4();
     let vault_id = Uuid::new_v4();
     let verify_token = generate_token(128);
     let verify_token_hash = hash_token(&verify_token);
@@ -213,9 +214,28 @@ pub async fn register(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    sqlx::query("INSERT INTO vaults (id, owner_id) VALUES ($1, $2)")
+    sqlx::query("INSERT INTO workspaces (id, name, owner_id) VALUES ($1, $2, $3)")
+        .bind(workspace_id)
+        .bind("Personal Workspace")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    sqlx::query(
+        "INSERT INTO workspace_members (workspace_id, user_id, role)
+         VALUES ($1, $2, 'owner')",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
         .bind(vault_id)
         .bind(user_id)
+        .bind(workspace_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -751,5 +771,4 @@ pub async fn public_keys(
         }))),
     }
 }
-
 

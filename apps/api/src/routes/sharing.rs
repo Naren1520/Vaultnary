@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     error::ApiError,
     middleware::auth::AuthUser,
+    routes::vaults::decode_base64_or_hex,
     state::AppState,
 };
 use shared::AppError;
@@ -89,6 +90,7 @@ pub async fn create_invitation(
     }
 
     let encrypted_dek: Option<&str> = body.get("encrypted_dek").and_then(|v| v.as_str());
+    let encrypted_dek_bytes = encrypted_dek.and_then(decode_base64_or_hex);
 
     let id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
@@ -113,7 +115,7 @@ pub async fn create_invitation(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     /* Store key envelope for invitee if DEK provided */
-    if let Some(dek) = encrypted_dek {
+    if let Some(dek) = encrypted_dek_bytes {
         /* Look up invitee user id */
         let invitee: Option<(Uuid,)> = sqlx::query_as(
             "SELECT id FROM users WHERE email = $1",

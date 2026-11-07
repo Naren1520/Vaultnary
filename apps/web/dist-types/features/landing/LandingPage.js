@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, Shield, Users, Eye, Share2, KeyRound, ArrowRight } from 'lucide-react';
@@ -21,12 +21,14 @@ export default function LandingPage() {
 }
 function LPNav() {
     const [solid, setSolid] = useState(false);
+    const [imgFailed, setImgFailed] = useState(false);
+    const logoUrl = new URL('../../assets/logo.png', import.meta.url).href;
     useEffect(() => {
         const fn = () => setSolid(window.scrollY > 32);
         window.addEventListener('scroll', fn, { passive: true });
         return () => window.removeEventListener('scroll', fn);
     }, []);
-    return (_jsx("header", { className: `lp-nav ${solid ? 'lp-nav--solid' : ''}`, children: _jsxs("div", { className: "lp-nav__row", children: [_jsxs(Link, { to: "/", className: "lp-nav__brand", children: [_jsx(Lock, { size: 18, strokeWidth: 2, "aria-hidden": "true" }), "Vaultnary"] }), _jsxs("nav", { "aria-label": "Site navigation", className: "lp-nav__links", children: [_jsx("a", { href: "#features", className: "lp-nav__link", children: "Features" }), _jsx("a", { href: "#steps", className: "lp-nav__link", children: "How it works" }), _jsx(Link, { to: "/login", className: "lp-nav__link", children: "Sign in" }), _jsx(Link, { to: "/register", className: "lp-btn-outline", children: "Get started" })] })] }) }));
+    return (_jsx("header", { className: `lp-nav ${solid ? 'lp-nav--solid' : ''}`, children: _jsxs("div", { className: "lp-nav__row", children: [_jsx(Link, { to: "/", className: "lp-nav__brand", children: imgFailed ? (_jsxs(_Fragment, { children: [_jsx(Lock, { size: 18, strokeWidth: 2, "aria-hidden": "true" }), "Vaultnary"] })) : (_jsx("img", { src: logoUrl, alt: "Vaultnary", onError: () => setImgFailed(true), style: { height: '2rem', width: 'auto', objectFit: 'contain' } })) }), _jsxs("nav", { "aria-label": "Site navigation", className: "lp-nav__links", children: [_jsx("a", { href: "#features", className: "lp-nav__link", children: "Features" }), _jsx("a", { href: "#steps", className: "lp-nav__link", children: "How it works" }), _jsx(Link, { to: "/login", className: "lp-nav__link", children: "Sign in" }), _jsx(Link, { to: "/register", className: "lp-btn-outline", children: "Get started" })] })] }) }));
 }
 function LPHero() {
     const bgRef = useRef(null);
@@ -135,5 +137,7 @@ function LPCta() {
     return (_jsxs("section", { className: "lp-cta", "aria-label": "Get started", children: [_jsx("div", { className: "lp-cta__bg", "aria-hidden": "true" }), _jsx("div", { className: "lp-cta__scrim", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-cta__inner reveal", children: [_jsxs("h2", { className: "lp-cta__h2", children: ["Stop sharing passwords.", _jsx("br", {}), "Start sharing access."] }), _jsx("p", { className: "lp-cta__sub", children: "Free to start. No credit card. Works immediately." }), _jsxs(Link, { to: "/register", className: "lp-btn-primary lp-btn-primary--lg", children: ["Create your free vault ", _jsx(ArrowRight, { size: 16, strokeWidth: 2.5, "aria-hidden": "true" })] })] })] }));
 }
 function LPFooter() {
-    return (_jsx("footer", { className: "lp-footer", role: "contentinfo", children: _jsxs("div", { className: "lp-wrap", children: [_jsxs("div", { className: "lp-footer__row", children: [_jsxs("span", { className: "lp-footer__brand", children: [_jsx(Lock, { size: 15, strokeWidth: 2, "aria-hidden": "true" }), " Vaultnary"] }), _jsx("p", { className: "lp-footer__copy", children: "Your credentials, always under your control." }), _jsxs("nav", { "aria-label": "Footer links", className: "lp-footer__links", children: [_jsx(Link, { to: "/register", children: "Get started" }), _jsx(Link, { to: "/login", children: "Sign in" })] })] }), _jsxs("div", { className: "lp-footer__bottom", children: [_jsxs("p", { className: "lp-footer__legal", children: ["\u00A9 ", new Date().getFullYear(), " Naren S J. All rights reserved. Proprietary software \u2014 not open source."] }), _jsx("p", { className: "lp-footer__legal", children: "narensonu1520@gmail.com" })] })] }) }));
+    const [imgFailed, setImgFailed] = useState(false);
+    const logoUrl = new URL('../../assets/logo.png', import.meta.url).href;
+    return (_jsx("footer", { className: "lp-footer", role: "contentinfo", children: _jsxs("div", { className: "lp-wrap", children: [_jsxs("div", { className: "lp-footer__row", children: [_jsx("span", { className: "lp-footer__brand", children: imgFailed ? (_jsxs(_Fragment, { children: [_jsx(Lock, { size: 15, strokeWidth: 2, "aria-hidden": "true" }), " Vaultnary"] })) : (_jsx("img", { src: logoUrl, alt: "Vaultnary", onError: () => setImgFailed(true), style: { height: '1.5rem', width: 'auto', objectFit: 'contain' } })) }), _jsx("p", { className: "lp-footer__copy", children: "Your credentials, always under your control." }), _jsxs("nav", { "aria-label": "Footer links", className: "lp-footer__links", children: [_jsx(Link, { to: "/register", children: "Get started" }), _jsx(Link, { to: "/login", children: "Sign in" })] })] }), _jsxs("div", { className: "lp-footer__bottom", children: [_jsxs("p", { className: "lp-footer__legal", children: ["\u00A9 ", new Date().getFullYear(), " Naren S J. All rights reserved. Proprietary software \u2014 not open source."] }), _jsx("p", { className: "lp-footer__legal", children: "narensonu1520@gmail.com" })] })] }) }));
 }

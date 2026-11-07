@@ -57,9 +57,12 @@ impl IntoResponse for ApiError {
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "Request payload is too large.".to_string(),
             ),
-            AppError::Internal(_) => (
+            AppError::Internal(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred.".to_string(),
+                {
+                    tracing::error!("Internal error: {:?}", e);
+                    "An unexpected error occurred.".to_string()
+                },
             ),
         };
 

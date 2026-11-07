@@ -9,6 +9,7 @@ interface VaultItemMeta {
   id: string
   name: string
   credential_type: CredentialType
+  payload_metadata: Record<string, string> | null
   tags: string[]
   notes: string | null
   last_accessed_at: string | null
@@ -16,6 +17,16 @@ interface VaultItemMeta {
   updated_at: string
   inherited_from: { id: string; name: string } | null
 }
+
+const SECRET_CREDENTIAL_TYPES = new Set<CredentialType>([
+  'website',
+  'database',
+  'api_key',
+  'token',
+  'ssh',
+  'totp',
+  'recovery_code',
+])
 
 interface DetailResponse {
   data: VaultItemMeta
@@ -66,8 +77,18 @@ export default function VaultItemDetail() {
         </p>
       )}
 
-      {/* Secret field -decrypt wired in Task 21 */}
-      <SecretField itemId={item.id} label="Secret" />
+      {item.payload_metadata && Object.entries(item.payload_metadata).map(([key, value]) => (
+        <div key={key}>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            {key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}
+          </p>
+          <p style={{ fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>{value}</p>
+        </div>
+      ))}
+
+      {SECRET_CREDENTIAL_TYPES.has(item.credential_type) && (
+        <SecretField itemId={item.id} label="Secret" />
+      )}
 
       {/* Tags */}
       {item.tags.length > 0 && (

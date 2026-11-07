@@ -11,6 +11,10 @@ use uuid::Uuid;
 use crate::{
     error::{ApiError, ErrorDetail},
     middleware::auth::AuthUser,
+    routes::workspaces::{
+        default_workspace_id, requested_workspace_id, require_workspace_editor,
+        workspace_member_role,
+    },
     state::AppState,
 };
 use shared::AppError;
@@ -46,15 +50,21 @@ pub async fn create_project(
 ) -> Result<impl IntoResponse, ApiError> {
     let (name, description) = validate_project_fields(&body)?;
     let db = state.db();
+    let workspace_id = match requested_workspace_id(&body)? {
+        Some(workspace_id) => workspace_id,
+        None => default_workspace_id(db, auth.user_id).await?,
+    };
+    require_workspace_editor(db, workspace_id, auth.user_id).await?;
     let id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
 
     sqlx::query(
-        "INSERT INTO projects (id, owner_id, name, description, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $5)",
+        "INSERT INTO projects (id, owner_id, workspace_id, name, description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)",
     )
     .bind(id)
     .bind(auth.user_id)
+    .bind(workspace_id)
     .bind(&name)
     .bind(&description)
     .bind(now)
@@ -63,11 +73,11 @@ pub async fn create_project(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct ProjectResp { id: Uuid, name: String, description: Option<String>, created_at: String }
+    struct ProjectResp { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({ "data": ProjectResp {
-            id, name, description,
+            id, workspace_id, name, description,
             created_at: now.to_string(),
         }})),
     ).into_response())
@@ -79,9 +89,13 @@ pub async fn list_projects(
     Extension(auth): Extension<AuthUser>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, String, Option<String>, OffsetDateTime);
+    type Row = (Uuid, Uuid, String, Option<String>, OffsetDateTime);
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT id, name, description, created_at FROM projects WHERE owner_id = $1 ORDER BY created_at DESC",
+        "SELECT p.id, p.workspace_id, p.name, p.description, p.created_at
+         FROM projects p
+         JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+         WHERE wm.user_id = $1
+         ORDER BY p.created_at DESC",
     )
     .bind(auth.user_id)
     .fetch_all(db)
@@ -89,9 +103,9 @@ pub async fn list_projects(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct ProjectItem { id: Uuid, name: String, description: Option<String>, created_at: String }
-    let items: Vec<ProjectItem> = rows.into_iter().map(|(id, name, desc, ca)| ProjectItem {
-        id, name, description: desc, created_at: ca.to_string(),
+    struct ProjectItem { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
+    let items: Vec<ProjectItem> = rows.into_iter().map(|(id, workspace_id, name, desc, ca)| ProjectItem {
+        id, workspace_id, name, description: desc, created_at: ca.to_string(),
     }).collect();
 
     Ok(Json(serde_json::json!({ "data": items })))
@@ -104,20 +118,23 @@ pub async fn get_project(
     Path(project_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, String, Option<String>, OffsetDateTime);
+    type Row = (Uuid, Uuid, String, Option<String>, OffsetDateTime);
     let row: Option<Row> = sqlx::query_as(
-        "SELECT id, name, description, created_at FROM projects WHERE id = $1 AND owner_id = $2",
+        "SELECT p.id, p.workspace_id, p.name, p.description, p.created_at
+         FROM projects p
+         JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+         WHERE p.id = $1 AND wm.user_id = $2",
     )
     .bind(project_id)
-    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (id, name, description, created_at) = row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let (id, workspace_id, name, description, created_at) =
+        row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
     #[derive(Serialize)]
-    struct ProjectResp { id: Uuid, name: String, description: Option<String>, created_at: String }
-    Ok(Json(serde_json::json!({ "data": ProjectResp { id, name, description, created_at: created_at.to_string() } })))
+    struct ProjectResp { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
+    Ok(Json(serde_json::json!({ "data": ProjectResp { id, workspace_id, name, description, created_at: created_at.to_string() } })))
 }
 
 /* PUT /api/v1/projects/:project_id */
@@ -129,15 +146,23 @@ pub async fn update_project(
 ) -> Result<impl IntoResponse, ApiError> {
     let (name, description) = validate_project_fields(&body)?;
     let db = state.db();
+    let workspace_id: Option<(Uuid,)> = sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
+        .bind(project_id)
+        .fetch_optional(db)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    require_workspace_editor(db, workspace_id, auth.user_id).await?;
 
     let result = sqlx::query(
         "UPDATE projects SET name = $1, description = $2, updated_at = NOW()
-         WHERE id = $3 AND owner_id = $4",
+         WHERE id = $3",
     )
     .bind(&name)
     .bind(&description)
     .bind(project_id)
-    .bind(auth.user_id)
     .execute(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -156,18 +181,19 @@ pub async fn delete_project(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    /* Verify ownership */
-    let exists: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM projects WHERE id = $1 AND owner_id = $2",
-    )
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
     .bind(project_id)
-    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    if exists.is_none() {
-        return Err(ApiError::new(AppError::NotFound));
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
+    if !role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
     }
 
     let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -215,19 +241,18 @@ pub async fn project_credentials(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    /* Verify ownership */
-    let exists: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM projects WHERE id = $1 AND owner_id = $2",
+    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT workspace_id FROM projects WHERE id = $1",
     )
     .bind(project_id)
-    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    if exists.is_none() {
-        return Err(ApiError::new(AppError::NotFound));
-    }
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    workspace_member_role(db, workspace_id, auth.user_id).await?;
 
     type CredRow = (Uuid, String, String);
     let rows: Vec<CredRow> = sqlx::query_as(

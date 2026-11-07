@@ -17,6 +17,7 @@ pub mod sharing;
 pub mod usage;
 pub mod users;
 pub mod vaults;
+pub mod workspaces;
 
 /// Build the complete API router nested under `/api/v1/`.
 pub fn api_router() -> Router<AppState> {
@@ -46,12 +47,25 @@ fn v1_routes() -> Router<AppState> {
         .route("/users/me", get(users::get_me))
         .route("/users/lookup", get(users::lookup_user))
         .route("/users/:user_id", get(users::get_user))
+        // --- Workspaces ---
+        .route("/workspaces", get(workspaces::list_workspaces))
+        .route("/workspaces", post(workspaces::create_workspace))
+        .route("/workspaces/:workspace_id", get(workspaces::get_workspace))
+        .route("/workspaces/:workspace_id", put(workspaces::update_workspace))
+        .route(
+            "/workspaces/:workspace_id/members",
+            get(workspaces::list_members),
+        )
         // --- Vault Items ---
         .route("/vault/items", post(vaults::create_item))
         .route("/vault/items", get(vaults::list_items))
         .route("/vault/items/:item_id", get(vaults::get_item))
         .route("/vault/items/:item_id", put(vaults::update_item))
         .route("/vault/items/:item_id", delete(vaults::delete_item))
+        .route(
+            "/vault/items/:item_id/key-envelope",
+            get(credentials::get_key_envelope),
+        )
         .route("/vault/search", get(vaults::search_items))
         .route("/vault/favorites", get(vaults::list_favorites))
         .route("/vault/items/:item_id/favorite", post(vaults::add_favorite))

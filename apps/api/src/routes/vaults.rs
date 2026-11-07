@@ -38,6 +38,8 @@ struct VaultItemMeta {
     parent_item_id: Option<Uuid>,
     tags: Vec<String>,
     notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload_metadata: Option<serde_json::Value>,
     is_favorite: bool,
     last_accessed_at: Option<String>,
     created_at: String,
@@ -197,6 +199,12 @@ pub async fn create_item(
         .ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     let item_id = Uuid::new_v4();
+    let encrypted_payload_bytes: Option<Vec<u8>> = encrypted_payload
+        .map(|s| decode_base64_or_hex(s))
+        .flatten();
+    let encrypted_dek_bytes: Option<Vec<u8>> = encrypted_dek
+        .and_then(decode_base64_or_hex);
+
     let now = OffsetDateTime::now_utc();
 
     let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -214,7 +222,7 @@ pub async fn create_item(
     .bind(ctype_str)
     .bind(parent_item_id)
     .bind(&tags as &[String])
-    .bind(encrypted_payload)
+    .bind(encrypted_payload_bytes)
     .bind(payload_metadata)
     .bind(notes)
     .bind(now)
@@ -236,7 +244,7 @@ pub async fn create_item(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     /* Store key envelope if encrypted_dek provided */
-    if let Some(dek) = encrypted_dek {
+    if let Some(dek) = encrypted_dek_bytes {
         sqlx::query(
             "INSERT INTO credential_key_envelopes (id, item_id, user_id, encrypted_dek, created_at)
              VALUES ($1, $2, $3, $4, $5)",
@@ -270,6 +278,7 @@ pub async fn create_item(
         parent_item_id,
         tags,
         notes: notes.map(String::from),
+        payload_metadata: None,
         is_favorite: false,
         last_accessed_at: None,
         created_at: now.to_string(),
@@ -360,6 +369,7 @@ pub async fn list_items(
                 parent_item_id: parent_id,
                 tags,
                 notes,
+                payload_metadata: None,
                 is_favorite: is_fav,
                 last_accessed_at: last_acc.map(|t| t.to_string()),
                 created_at: created.to_string(),
@@ -427,6 +437,7 @@ pub async fn get_item(
 
     type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
         Option<String>,
+        Option<serde_json::Value>,
         bool,
         Option<OffsetDateTime>,
         OffsetDateTime,
@@ -435,7 +446,7 @@ pub async fn get_item(
 
     let row: Option<ItemRow> = sqlx::query_as(
         "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                vi.tags, vi.notes, COALESCE(cp.is_favorite, false),
+                vi.tags, vi.notes, vi.payload_metadata, COALESCE(cp.is_favorite, false),
                 vi.last_accessed_at, vi.created_at, vi.updated_at
          FROM vault_items vi
          LEFT JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $2
@@ -447,7 +458,7 @@ pub async fn get_item(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated) =
+    let (id, name, ctype, parent_id, tags_val, notes, payload_metadata, is_fav, last_acc, created, updated) =
         row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     /* Update last_accessed_at */
@@ -476,6 +487,7 @@ pub async fn get_item(
         parent_item_id: parent_id,
         tags,
         notes,
+        payload_metadata,
         is_favorite: is_fav,
         last_accessed_at: last_acc.map(|t| t.to_string()),
         created_at: created.to_string(),
@@ -536,6 +548,10 @@ pub async fn update_item(
             .map_err(ApiError::new)?;
     }
 
+    let encrypted_payload_bytes: Option<Vec<u8>> = encrypted_payload
+        .map(|s| decode_base64_or_hex(s))
+        .flatten();
+
     sqlx::query(
         "UPDATE vault_items
          SET name = $1, credential_type = $2, tags = $3, encrypted_payload = $4,
@@ -545,7 +561,7 @@ pub async fn update_item(
     .bind(&name)
     .bind(ctype_str)
     .bind(&tags as &[String])
-    .bind(encrypted_payload)
+    .bind(encrypted_payload_bytes)
     .bind(payload_metadata)
     .bind(notes)
     .bind(item_id)
@@ -770,6 +786,7 @@ pub async fn list_favorites(
                 parent_item_id: parent_id,
                 tags: tags_val,
                 notes,
+                payload_metadata: None,
                 is_favorite: true,
                 last_accessed_at: last_acc.map(|t| t.to_string()),
                 created_at: created.to_string(),
@@ -900,6 +917,7 @@ pub async fn recent_items(
                 parent_item_id: parent_id,
                 tags: tags_val,
                 notes,
+                payload_metadata: None,
                 is_favorite: is_fav,
                 last_accessed_at: last_acc.map(|t| t.to_string()),
                 created_at: created.to_string(),
@@ -930,4 +948,40 @@ fn extract_tags(val: &serde_json::Value) -> Vec<String> {
     val.as_array()
         .map(|arr| arr.iter().filter_map(|t| t.as_str().map(String::from)).collect())
         .unwrap_or_default()
+}
+
+/// Decode a base64 or hex string to bytes.
+/// Returns None if the input is empty or decoding fails.
+pub(super) fn decode_base64_or_hex(s: &str) -> Option<Vec<u8>> {
+    if s.is_empty() { return None; }
+    // Try hex first (even length, all hex chars)
+    if s.len() % 2 == 0 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+        return hex::decode(s).ok();
+    }
+    // Try base64
+    let cleaned = s.replace(['\n', '\r', ' '], "");
+    let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+    if !cleaned.chars().all(|c| alphabet.contains(&(c as u8))) {
+        return None;
+    }
+    let mut table = [255u8; 256];
+    for (i, &c) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".iter().enumerate() {
+        table[c as usize] = i as u8;
+    }
+    let bytes = cleaned.as_bytes();
+    if bytes.len() % 4 != 0 { return None; }
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len() / 4 * 3);
+    let mut i = 0;
+    while i < bytes.len() {
+        let a = table[bytes[i] as usize];
+        let b = table[bytes[i+1] as usize];
+        let c = if bytes[i+2] == b'=' { 0 } else { table[bytes[i+2] as usize] };
+        let d = if bytes[i+3] == b'=' { 0 } else { table[bytes[i+3] as usize] };
+        if a == 255 || b == 255 { return None; }
+        out.push((a << 2) | (b >> 4));
+        if bytes[i+2] != b'=' { out.push((b << 4) | (c >> 2)); }
+        if bytes[i+3] != b'=' { out.push((c << 6) | d); }
+        i += 4;
+    }
+    Some(out)
 }

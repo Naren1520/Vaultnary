@@ -11,6 +11,9 @@ use uuid::Uuid;
 use crate::{
     error::{ApiError, ErrorDetail},
     middleware::auth::AuthUser,
+    routes::workspaces::{
+        default_workspace_id, require_workspace_editor, workspace_member_role,
+    },
     state::AppState,
 };
 use shared::AppError;
@@ -48,10 +51,30 @@ fn validate_service_fields(
             vec![ErrorDetail { field: "environment".into(), rule: "invalid_enum".into() }],
         ));
     }
-    let project_id: Option<Uuid> = body
-        .get("project_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| Uuid::parse_str(s).ok());
+    let project_id = match body.get("project_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(value)) => {
+            let project_id = Uuid::parse_str(value).map_err(|_| {
+                ApiError::with_details(
+                    AppError::UnprocessableEntity("project_id: must be a UUID".into()),
+                    vec![ErrorDetail {
+                        field: "project_id".into(),
+                        rule: "uuid".into(),
+                    }],
+                )
+            })?;
+            Some(project_id)
+        }
+        Some(_) => {
+            return Err(ApiError::with_details(
+                AppError::UnprocessableEntity("project_id: must be a UUID".into()),
+                vec![ErrorDetail {
+                    field: "project_id".into(),
+                    rule: "uuid".into(),
+                }],
+            ));
+        }
+    };
     Ok((name, description, environment, project_id))
 }
 
@@ -64,29 +87,34 @@ pub async fn create_service(
     let (name, description, environment, project_id) = validate_service_fields(&body)?;
     let db = state.db();
 
-    /* Verify project is accessible if provided */
-    if let Some(pid) = project_id {
-        let exists: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT id FROM projects WHERE id = $1 AND owner_id = $2",
+    let workspace_id = if let Some(pid) = project_id {
+        let project_workspace: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT p.workspace_id FROM projects p
+             JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+             WHERE p.id = $1 AND wm.user_id = $2",
         )
         .bind(pid)
         .bind(auth.user_id)
         .fetch_optional(db)
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-        if exists.is_none() {
-            return Err(ApiError::new(AppError::NotFound));
-        }
-    }
+        project_workspace
+            .map(|(workspace_id,)| workspace_id)
+            .ok_or_else(|| ApiError::new(AppError::NotFound))?
+    } else {
+        default_workspace_id(db, auth.user_id).await?
+    };
+    require_workspace_editor(db, workspace_id, auth.user_id).await?;
 
     let id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
     sqlx::query(
-        "INSERT INTO services (id, owner_id, name, description, environment, project_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)",
+        "INSERT INTO services (id, owner_id, workspace_id, name, description, environment, project_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)",
     )
     .bind(id)
     .bind(auth.user_id)
+    .bind(workspace_id)
     .bind(&name)
     .bind(&description)
     .bind(&environment)
@@ -99,6 +127,7 @@ pub async fn create_service(
     #[derive(Serialize)]
     struct ServiceResp {
         id: Uuid,
+        workspace_id: Uuid,
         name: String,
         description: Option<String>,
         environment: String,
@@ -108,7 +137,7 @@ pub async fn create_service(
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({ "data": ServiceResp {
-            id, name, description, environment, project_id,
+            id, workspace_id, name, description, environment, project_id,
             created_at: now.to_string(),
         }})),
     ).into_response())
@@ -120,10 +149,13 @@ pub async fn list_services(
     Extension(auth): Extension<AuthUser>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
+    type Row = (Uuid, Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT id, name, description, environment, project_id, created_at
-         FROM services WHERE owner_id = $1 ORDER BY created_at DESC",
+        "SELECT s.id, s.workspace_id, s.name, s.description, s.environment, s.project_id, s.created_at
+         FROM services s
+         JOIN workspace_members wm ON wm.workspace_id = s.workspace_id
+         WHERE wm.user_id = $1
+         ORDER BY s.created_at DESC",
     )
     .bind(auth.user_id)
     .fetch_all(db)
@@ -133,14 +165,15 @@ pub async fn list_services(
     #[derive(Serialize)]
     struct ServiceItem {
         id: Uuid,
+        workspace_id: Uuid,
         name: String,
         description: Option<String>,
         environment: String,
         project_id: Option<Uuid>,
         created_at: String,
     }
-    let items: Vec<ServiceItem> = rows.into_iter().map(|(id, name, desc, env, pid, ca)| ServiceItem {
-        id, name, description: desc, environment: env, project_id: pid, created_at: ca.to_string(),
+    let items: Vec<ServiceItem> = rows.into_iter().map(|(id, workspace_id, name, desc, env, pid, ca)| ServiceItem {
+        id, workspace_id, name, description: desc, environment: env, project_id: pid, created_at: ca.to_string(),
     }).collect();
     Ok(Json(serde_json::json!({ "data": items })))
 }
@@ -152,10 +185,12 @@ pub async fn get_service(
     Path(service_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
+    type Row = (Uuid, Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
     let row: Option<Row> = sqlx::query_as(
-        "SELECT id, name, description, environment, project_id, created_at
-         FROM services WHERE id = $1 AND owner_id = $2",
+        "SELECT s.id, s.workspace_id, s.name, s.description, s.environment, s.project_id, s.created_at
+         FROM services s
+         JOIN workspace_members wm ON wm.workspace_id = s.workspace_id
+         WHERE s.id = $1 AND wm.user_id = $2",
     )
     .bind(service_id)
     .bind(auth.user_id)
@@ -163,12 +198,13 @@ pub async fn get_service(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (id, name, description, environment, project_id, created_at) =
+    let (id, workspace_id, name, description, environment, project_id, created_at) =
         row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     #[derive(Serialize)]
     struct ServiceResp {
         id: Uuid,
+        workspace_id: Uuid,
         name: String,
         description: Option<String>,
         environment: String,
@@ -176,7 +212,7 @@ pub async fn get_service(
         created_at: String,
     }
     Ok(Json(serde_json::json!({ "data": ServiceResp {
-        id, name, description, environment, project_id, created_at: created_at.to_string(),
+        id, workspace_id, name, description, environment, project_id, created_at: created_at.to_string(),
     }})))
 }
 
@@ -190,31 +226,39 @@ pub async fn update_service(
     let (name, description, environment, project_id) = validate_service_fields(&body)?;
     let db = state.db();
 
-    /* Verify project is accessible if provided */
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM services WHERE id = $1")
+            .bind(service_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    require_workspace_editor(db, workspace_id, auth.user_id).await?;
+
     if let Some(pid) = project_id {
-        let exists: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT id FROM projects WHERE id = $1 AND owner_id = $2",
+        let project_workspace: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT workspace_id FROM projects WHERE id = $1",
         )
         .bind(pid)
-        .bind(auth.user_id)
         .fetch_optional(db)
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-        if exists.is_none() {
+        if project_workspace.map(|(project_workspace,)| project_workspace) != Some(workspace_id) {
             return Err(ApiError::new(AppError::NotFound));
         }
     }
 
     let result = sqlx::query(
         "UPDATE services SET name = $1, description = $2, environment = $3, project_id = $4, updated_at = NOW()
-         WHERE id = $5 AND owner_id = $6",
+         WHERE id = $5",
     )
     .bind(&name)
     .bind(&description)
     .bind(&environment)
     .bind(project_id)
     .bind(service_id)
-    .bind(auth.user_id)
     .execute(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -233,17 +277,20 @@ pub async fn delete_service(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let exists: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM services WHERE id = $1 AND owner_id = $2",
+    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT workspace_id FROM services WHERE id = $1",
     )
     .bind(service_id)
-    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    if exists.is_none() {
-        return Err(ApiError::new(AppError::NotFound));
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
+    if !role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
     }
 
     let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -270,18 +317,18 @@ pub async fn service_credentials(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let exists: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM services WHERE id = $1 AND owner_id = $2",
+    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT workspace_id FROM services WHERE id = $1",
     )
     .bind(service_id)
-    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    if exists.is_none() {
-        return Err(ApiError::new(AppError::NotFound));
-    }
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    workspace_member_role(db, workspace_id, auth.user_id).await?;
 
     type CredRow = (Uuid, String, String);
     let rows: Vec<CredRow> = sqlx::query_as(

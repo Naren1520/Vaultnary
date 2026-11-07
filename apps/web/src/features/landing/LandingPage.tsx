@@ -34,6 +34,9 @@ export default function LandingPage() {
 
 function LPNav() {
   const [solid, setSolid] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
+  const logoUrl = new URL('../../assets/logo.png', import.meta.url).href
+
   useEffect(() => {
     const fn = () => setSolid(window.scrollY > 32)
     window.addEventListener('scroll', fn, { passive: true })
@@ -44,8 +47,19 @@ function LPNav() {
     <header className={`lp-nav ${solid ? 'lp-nav--solid' : ''}`}>
       <div className="lp-nav__row">
         <Link to="/" className="lp-nav__brand">
-          <Lock size={18} strokeWidth={2} aria-hidden="true" />
-          Vaultnary
+          {imgFailed ? (
+            <>
+              <Lock size={18} strokeWidth={2} aria-hidden="true" />
+              Vaultnary
+            </>
+          ) : (
+            <img
+              src={logoUrl}
+              alt="Vaultnary"
+              onError={() => setImgFailed(true)}
+              style={{ height: '2rem', width: 'auto', objectFit: 'contain' }}
+            />
+          )}
         </Link>
         <nav aria-label="Site navigation" className="lp-nav__links">
           <a href="#features" className="lp-nav__link">Features</a>
@@ -263,12 +277,19 @@ function LPCta() {
 }
 
 function LPFooter() {
+  const [imgFailed, setImgFailed] = useState(false)
+  const logoUrl = new URL('../../assets/logo.png', import.meta.url).href
+
   return (
     <footer className="lp-footer" role="contentinfo">
       <div className="lp-wrap">
         <div className="lp-footer__row">
           <span className="lp-footer__brand">
-            <Lock size={15} strokeWidth={2} aria-hidden="true" /> Vaultnary
+            {imgFailed ? (
+              <><Lock size={15} strokeWidth={2} aria-hidden="true" /> Vaultnary</>
+            ) : (
+              <img src={logoUrl} alt="Vaultnary" onError={() => setImgFailed(true)} style={{ height: '1.5rem', width: 'auto', objectFit: 'contain' }} />
+            )}
           </span>
           <p className="lp-footer__copy">Your credentials, always under your control.</p>
           <nav aria-label="Footer links" className="lp-footer__links">
