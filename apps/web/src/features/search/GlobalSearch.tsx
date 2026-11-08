@@ -106,7 +106,7 @@ export default function GlobalSearch({ query, onQueryChange }: GlobalSearchProps
   return (
     <div
       ref={containerRef}
-      style={{ position: 'relative', width: '16rem' }}
+      className="global-search"
     >
       <input
         type="search"

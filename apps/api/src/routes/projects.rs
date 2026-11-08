@@ -126,6 +126,7 @@ pub async fn get_project(
          WHERE p.id = $1 AND wm.user_id = $2",
     )
     .bind(project_id)
+    .bind(auth.user_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -274,4 +275,34 @@ pub async fn project_credentials(
     struct CredItem { id: Uuid, name: String, credential_type: String }
     let items: Vec<CredItem> = rows.into_iter().map(|(id, name, ct)| CredItem { id, name, credential_type: ct }).collect();
     Ok(Json(serde_json::json!({ "data": items })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_project_fields, MAX_DESC_LEN, MAX_NAME_LEN};
+
+    #[test]
+    fn project_validation_trims_name_and_accepts_empty_description() {
+        let (name, description) = validate_project_fields(&serde_json::json!({
+            "name": "  Platform  ",
+            "description": null
+        }))
+        .unwrap();
+        assert_eq!(name, "Platform");
+        assert_eq!(description, None);
+    }
+
+    #[test]
+    fn project_validation_rejects_empty_or_oversized_fields() {
+        assert!(validate_project_fields(&serde_json::json!({ "name": "   " })).is_err());
+        assert!(validate_project_fields(&serde_json::json!({
+            "name": "x".repeat(MAX_NAME_LEN + 1)
+        }))
+        .is_err());
+        assert!(validate_project_fields(&serde_json::json!({
+            "name": "Project",
+            "description": "x".repeat(MAX_DESC_LEN + 1)
+        }))
+        .is_err());
+    }
 }

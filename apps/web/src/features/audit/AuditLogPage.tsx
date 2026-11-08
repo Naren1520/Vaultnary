@@ -44,7 +44,7 @@ export default function AuditLogPage() {
       <Topbar breadcrumbs={[{ label: 'Audit Log', href: '/app/audit' }]} />
       <div style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
         {/* Filters */}
-        <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+        <div className="audit-filter">
           <label htmlFor="action-filter" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Filter by action</label>
           <input
             id="action-filter"
@@ -52,7 +52,7 @@ export default function AuditLogPage() {
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
             placeholder="e.g. user.login"
-            style={{ padding: 'var(--space-1) var(--space-3)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', width: '16rem' }}
+            className="audit-filter-input"
           />
         </div>
 

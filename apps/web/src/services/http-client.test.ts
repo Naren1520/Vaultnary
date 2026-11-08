@@ -26,6 +26,7 @@ function makeResponse(status: number, body: unknown, headers: Record<string, str
     headers: {
       get: (key: string) => headers[key.toLowerCase()] ?? null,
     },
+    text: () => Promise.resolve(JSON.stringify(body)),
     json: () => Promise.resolve(body),
   }
 }

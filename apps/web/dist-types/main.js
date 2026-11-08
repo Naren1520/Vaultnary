@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import './styles/reset.css';
 import './styles/tokens.css';
 import './styles/utilities.css';
+import './styles/responsive.css';
 import App from './App';
 const rootEl = document.getElementById('root');
 if (!rootEl)

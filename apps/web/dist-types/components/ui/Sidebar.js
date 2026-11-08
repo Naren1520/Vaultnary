@@ -13,35 +13,15 @@ const navItems = [
 ];
 export default function Sidebar() {
     const location = useLocation();
-    return (_jsxs("aside", { "aria-label": "Main navigation", style: {
-            width: 'var(--sidebar-width)',
-            minHeight: '100vh',
-            borderRight: 'var(--border-card)',
-            backgroundColor: 'var(--color-bg-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: 'var(--space-4) 0',
-            flexShrink: 0,
-        }, children: [_jsx("div", { style: {
-                    padding: '0 var(--space-4)',
-                    marginBottom: 'var(--space-6)',
-                    display: 'flex',
-                    alignItems: 'center',
-                }, children: _jsx(Link, { to: "/app/vault", style: { textDecoration: 'none', display: 'flex', alignItems: 'center' }, children: _jsx(LogoOrText, {}) }) }), _jsx("nav", { "aria-label": "Sidebar navigation", children: _jsx("ul", { style: { listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', margin: 0, padding: 0 }, children: navItems.map((item) => {
+    return (_jsxs("aside", { "aria-label": "Main navigation", className: "app-sidebar", children: [_jsx("div", { className: "sidebar-brand", children: _jsx(Link, { to: "/app/vault", style: { textDecoration: 'none', display: 'flex', alignItems: 'center' }, children: _jsx(LogoOrText, {}) }) }), _jsx("nav", { "aria-label": "Sidebar navigation", children: _jsx("ul", { className: "sidebar-links", children: navItems.map((item) => {
                         const isActive = location.pathname.startsWith(item.href);
-                        return (_jsx("li", { children: _jsxs(Link, { to: item.href, "aria-current": isActive ? 'page' : undefined, style: {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 'var(--space-3)',
-                                    padding: 'var(--space-2) var(--space-4)',
+                        return (_jsx("li", { children: _jsxs(Link, { to: item.href, "aria-current": isActive ? 'page' : undefined, className: "sidebar-link", style: {
                                     fontSize: 'var(--text-sm)',
                                     fontWeight: isActive ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
                                     color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)',
                                     backgroundColor: isActive ? 'rgba(0,0,0,0.05)' : 'transparent',
                                     borderRadius: 'var(--radius-md)',
-                                    margin: '0 var(--space-2)',
-                                    textDecoration: 'none',
-                                }, children: [item.icon, item.label] }) }, item.href));
+                                }, children: [item.icon, _jsx("span", { children: item.label })] }) }, item.href));
                     }) }) })] }));
 }
 /** Shows logo.png if the file exists, otherwise falls back to the text "Vaultnary" */

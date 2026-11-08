@@ -7,7 +7,7 @@ use futures_util::future::BoxFuture;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 
-use crate::middleware::auth::AuthUser;
+use crate::middleware::auth::{is_public_path, AuthUser};
 
 /// Tower layer that enforces CSRF token validation on mutating requests.
 ///
@@ -56,18 +56,7 @@ where
             }
 
             // Public auth endpoints never require CSRF — they create or reset sessions.
-            let path = req.uri().path();
-            let public_paths = [
-                "/api/v1/auth/login",
-                "/api/v1/auth/register",
-                "/api/v1/auth/forgot-password",
-                "/api/v1/auth/reset-password",
-                "/api/v1/auth/resend-verification",
-                "/api/v1/auth/recover",
-                "/api/v1/dev/verify-email",
-                "/api/v1/dev/reset-password",
-            ];
-            if public_paths.contains(&path) {
+            if is_public_path(req.uri().path()) {
                 return inner.call(req).await;
             }
 

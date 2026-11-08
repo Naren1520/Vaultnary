@@ -5,7 +5,7 @@ import EmptyState from '../../components/feedback/EmptyState'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import Topbar from '../../components/ui/Topbar'
 import { useToast } from '../../components/ui/Toast'
-import { apiGet, apiPost, apiPut } from '../../services/http-client'
+import { apiDelete, apiGet, apiPost, apiPut } from '../../services/http-client'
 
 interface Workspace {
   id: string
@@ -27,6 +27,8 @@ export default function WorkspacesPage() {
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
+  const [memberEmail, setMemberEmail] = useState('')
+  const [memberRole, setMemberRole] = useState<'admin' | 'editor' | 'viewer'>('editor')
   const [renamedWorkspaceName, setRenamedWorkspaceName] = useState('')
   const [loading, setLoading] = useState(true)
   const [membersLoading, setMembersLoading] = useState(false)
@@ -130,12 +132,74 @@ export default function WorkspacesPage() {
     }
   }
 
+  async function handleAddMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedId) return
+    setSaving(true)
+    setError('')
+    try {
+      await apiPost(`/api/v1/workspaces/${selectedId}/members`, {
+        email: memberEmail,
+        role: memberRole,
+      })
+      const response = await apiGet<{ data: WorkspaceMember[] }>(
+        `/api/v1/workspaces/${selectedId}/members`,
+      )
+      setMembers(response.data)
+      setMemberEmail('')
+      showToast({ message: 'Workspace member added', type: 'success' })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not add workspace member.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleMemberRoleChange(userId: string, role: WorkspaceMember['role']) {
+    if (!selectedId || role === 'owner') return
+    setSaving(true)
+    setError('')
+    try {
+      await apiPut(`/api/v1/workspaces/${selectedId}/members/${userId}`, { role })
+      setMembers((current) =>
+        current.map((member) => member.user_id === userId ? { ...member, role } : member),
+      )
+      showToast({ message: 'Member role updated', type: 'success' })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update member role.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRemoveMember(userId: string, email: string) {
+    if (!selectedId) return
+    if (!window.confirm(`Remove ${email} from this workspace?`)) return
+    setSaving(true)
+    setError('')
+    try {
+      await apiDelete(`/api/v1/workspaces/${selectedId}/members/${userId}`)
+      setMembers((current) => current.filter((member) => member.user_id !== userId))
+      showToast({ message: 'Workspace member removed', type: 'success' })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not remove workspace member.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedId)
   const canManage = selectedWorkspace?.role === 'owner' || selectedWorkspace?.role === 'admin'
 
   useEffect(() => {
     setRenamedWorkspaceName(selectedWorkspace?.name ?? '')
   }, [selectedWorkspace?.id, selectedWorkspace?.name])
+
+  useEffect(() => {
+    if (selectedWorkspace?.role !== 'owner' && memberRole === 'admin') {
+      setMemberRole('editor')
+    }
+  }, [selectedWorkspace?.id, selectedWorkspace?.role, memberRole])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -256,6 +320,36 @@ export default function WorkspacesPage() {
                 <Users size={15} aria-hidden="true" />
                 Members
               </h3>
+              {canManage && (
+                <form
+                  onSubmit={handleAddMember}
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}
+                >
+                  <label htmlFor="workspace-member-email" style={visuallyHiddenStyle}>Member email</label>
+                  <input
+                    id="workspace-member-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={memberEmail}
+                    onChange={(event) => setMemberEmail(event.target.value)}
+                    placeholder="colleague@example.com"
+                    style={{ flex: '1 1 12rem', minWidth: 0, padding: 'var(--space-2) var(--space-3)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }}
+                  />
+                  <label htmlFor="workspace-member-role" style={visuallyHiddenStyle}>New member role</label>
+                  <select
+                    id="workspace-member-role"
+                    value={memberRole}
+                    onChange={(event) => setMemberRole(event.target.value as typeof memberRole)}
+                    style={{ padding: 'var(--space-2)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }}
+                  >
+                    {selectedWorkspace.role === 'owner' && <option value="admin">Admin</option>}
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <button type="submit" disabled={saving} style={actionButtonStyle}>Add member</button>
+                </form>
+              )}
               {membersLoading ? (
                 <SkeletonLoader variant="table-row" rows={1} />
               ) : members.length === 0 ? (
@@ -265,9 +359,40 @@ export default function WorkspacesPage() {
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 'var(--space-2)' }}>
                   {members.map((member) => (
-                    <li key={member.user_id} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', borderBottom: 'var(--border-card)', padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)' }}>
-                      <span>{member.email}</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>{member.role}</span>
+                    <li key={member.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', borderBottom: 'var(--border-card)', padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)' }}>
+                      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{member.email}</span>
+                      {canManage && member.role !== 'owner' ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <label htmlFor={`member-role-${member.user_id}`} style={visuallyHiddenStyle}>
+                            Role for {member.email}
+                          </label>
+                          <select
+                            id={`member-role-${member.user_id}`}
+                            value={member.role}
+                            disabled={saving}
+                            onChange={(event) => {
+                              const role = event.target.value as WorkspaceMember['role']
+                              void handleMemberRoleChange(member.user_id, role)
+                            }}
+                            style={{ padding: 'var(--space-1)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg)', color: 'var(--color-text)' }}
+                          >
+                            {selectedWorkspace.role === 'owner' && <option value="admin">Admin</option>}
+                            <option value="editor">Editor</option>
+                            <option value="viewer">Viewer</option>
+                          </select>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void handleRemoveMember(member.user_id, member.email)}
+                            aria-label={`Remove ${member.email}`}
+                            style={actionButtonStyle}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)' }}>{member.role}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -292,4 +417,16 @@ const actionButtonStyle: CSSProperties = {
   color: 'var(--color-text)',
   fontSize: 'var(--text-sm)',
   cursor: 'pointer',
+}
+
+const visuallyHiddenStyle: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0,0,0,0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 }

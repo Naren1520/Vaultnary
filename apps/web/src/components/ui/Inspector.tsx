@@ -11,14 +11,7 @@ export default function Inspector({ loading = false, children, title }: Inspecto
   return (
     <aside
       aria-label={title ?? 'Detail panel'}
-      style={{
-        width: 'var(--inspector-width)',
-        minHeight: '100%',
-        borderLeft: 'var(--border-card)',
-        backgroundColor: 'var(--color-bg)',
-        flexShrink: 0,
-        overflowY: 'auto',
-      }}
+      className="app-inspector"
     >
       {loading ? (
         <SkeletonLoader variant="detail-panel" />

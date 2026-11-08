@@ -22,6 +22,7 @@ function makeResponse(status, body, headers = {}) {
         headers: {
             get: (key) => headers[key.toLowerCase()] ?? null,
         },
+        text: () => Promise.resolve(JSON.stringify(body)),
         json: () => Promise.resolve(body),
     };
 }

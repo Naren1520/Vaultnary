@@ -77,7 +77,7 @@ export default function GlobalSearch({ query, onQueryChange }) {
         }
     }
     const showDropdown = open && query.trim().length > 0;
-    return (_jsxs("div", { ref: containerRef, style: { position: 'relative', width: '16rem' }, children: [_jsx("input", { type: "search", value: query, onChange: (e) => onQueryChange(e.target.value), onKeyDown: handleKeyDown, onFocus: () => { if (results.length > 0)
+    return (_jsxs("div", { ref: containerRef, className: "global-search", children: [_jsx("input", { type: "search", value: query, onChange: (e) => onQueryChange(e.target.value), onKeyDown: handleKeyDown, onFocus: () => { if (results.length > 0)
                     setOpen(true); }, placeholder: "Search vault\u2026", "aria-label": "Search vault", "aria-expanded": showDropdown, "aria-haspopup": "listbox", style: {
                     width: '100%',
                     padding: 'var(--space-1) var(--space-3)',

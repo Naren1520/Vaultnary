@@ -24,11 +24,11 @@ function InnerLoader() {
 export default function AppShell() {
   return (
     <ToastProvider>
-      <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <div className="app-shell">
         <Sidebar />
         <main
           id="main-content"
-          style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}
+          className="app-main"
         >
           <ErrorBoundary>
             <Suspense fallback={<InnerLoader />}>

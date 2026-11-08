@@ -291,6 +291,12 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 | POST | /vault/items/:id/invitations | Yes | Co-owner | Send share invitation |
 | GET | /vault/items/:id/invitations | Yes | Co-owner | List invitations |
 | DELETE | /vault/items/:id/permissions/:uid | Yes | Co-owner | Remove collaborator |
+| POST | /vault/export | Yes | - | Download versioned archive; secret values remain encrypted |
+| POST | /vault/import | Yes | - | Import a validated archive (maximum 50 MB); records an audit event |
+
+The browser verifies each encrypted payload with the unlocked user's private key
+before submitting an import. The API validates archive structure, references,
+and size, then inserts all items transactionally; archive paths are not extracted.
 
 ### Projects & Services
 | Method | Path | Description |
@@ -301,6 +307,14 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 | POST/GET | /services | Create / list owned services |
 | GET/PUT/DELETE | /services/:id | Get / update / delete service |
 | GET | /services/:id/credentials | Items linked to this service |
+
+### Workspaces
+| Method | Path | Description |
+|--------|------|-------------|
+| POST/GET | /workspaces | Create / list workspaces |
+| GET/PUT | /workspaces/:id | Get / rename a workspace |
+| GET/POST | /workspaces/:id/members | List members / add a registered user |
+| PUT/DELETE | /workspaces/:id/members/:user_id | Change a member's role / remove a member |
 
 ### Sharing
 | Method | Path | Description |

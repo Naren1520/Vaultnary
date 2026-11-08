@@ -43,8 +43,3 @@ pub async fn get_key_envelope(
         }
     })))
 }
-
-/// POST /api/v1/vault/items/:item_id/key-envelope -stub
-pub async fn create_key_envelope() -> impl IntoResponse {
-    axum::http::StatusCode::NOT_IMPLEMENTED
-}

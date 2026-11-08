@@ -5,26 +5,15 @@ import Breadcrumbs from './Breadcrumbs';
 const GlobalSearch = lazy(() => import('../../features/search/GlobalSearch'));
 export default function Topbar({ breadcrumbs = [], searchSlot, actionsSlot, showSearch = true, }) {
     const [query, setQuery] = useState('');
-    return (_jsxs("header", { style: {
-            height: '3rem',
+    return (_jsxs("header", { className: "app-topbar", style: {
             borderBottom: 'var(--border-card)',
             backgroundColor: 'var(--color-bg)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 var(--space-4)',
-            gap: 'var(--space-4)',
-            flexShrink: 0,
-        }, children: [breadcrumbs.length > 0 && (_jsx("div", { style: { flex: 1, minWidth: 0 }, children: _jsx(Breadcrumbs, { items: breadcrumbs }) })), showSearch && !searchSlot && (_jsx("div", { style: { flexShrink: 0 }, children: _jsx(Suspense, { fallback: _jsx(SearchPlaceholder, {}), children: _jsx(GlobalSearch, { query: query, onQueryChange: setQuery }) }) })), searchSlot && (_jsx("div", { style: { flexShrink: 0 }, children: searchSlot })), actionsSlot && (_jsx("div", { style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    flexShrink: 0,
-                }, children: actionsSlot }))] }));
+        }, children: [breadcrumbs.length > 0 && (_jsx("div", { className: "topbar-breadcrumbs", children: _jsx(Breadcrumbs, { items: breadcrumbs }) })), showSearch && !searchSlot && (_jsx("div", { className: "topbar-search", children: _jsx(Suspense, { fallback: _jsx(SearchPlaceholder, {}), children: _jsx(GlobalSearch, { query: query, onQueryChange: setQuery }) }) })), searchSlot && (_jsx("div", { className: "topbar-search", children: searchSlot })), actionsSlot && (_jsx("div", { className: "topbar-actions", children: actionsSlot }))] }));
 }
 /** Shown while GlobalSearch lazy-loads */
 function SearchPlaceholder() {
     return (_jsx("input", { type: "search", placeholder: "Search vault\u2026", disabled: true, "aria-label": "Search vault", style: {
-            width: '16rem',
+            width: 'min(16rem, 100%)',
             padding: 'var(--space-1) var(--space-3)',
             border: 'var(--border-input)',
             borderRadius: 'var(--radius-md)',

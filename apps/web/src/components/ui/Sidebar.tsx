@@ -24,25 +24,11 @@ export default function Sidebar() {
   return (
     <aside
       aria-label="Main navigation"
-      style={{
-        width: 'var(--sidebar-width)',
-        minHeight: '100vh',
-        borderRight: 'var(--border-card)',
-        backgroundColor: 'var(--color-bg-subtle)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: 'var(--space-4) 0',
-        flexShrink: 0,
-      }}
+      className="app-sidebar"
     >
       {/* Brand / Logo */}
       <div
-        style={{
-          padding: '0 var(--space-4)',
-          marginBottom: 'var(--space-6)',
-          display: 'flex',
-          alignItems: 'center',
-        }}
+        className="sidebar-brand"
       >
         <Link to="/app/vault" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
           <LogoOrText />
@@ -51,7 +37,7 @@ export default function Sidebar() {
 
       {/* Nav links */}
       <nav aria-label="Sidebar navigation">
-        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', margin: 0, padding: 0 }}>
+        <ul className="sidebar-links">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.href)
             return (
@@ -59,22 +45,17 @@ export default function Sidebar() {
                 <Link
                   to={item.href}
                   aria-current={isActive ? 'page' : undefined}
+                  className="sidebar-link"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-3)',
-                    padding: 'var(--space-2) var(--space-4)',
                     fontSize: 'var(--text-sm)',
                     fontWeight: isActive ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
                     color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)',
                     backgroundColor: isActive ? 'rgba(0,0,0,0.05)' : 'transparent',
                     borderRadius: 'var(--radius-md)',
-                    margin: '0 var(--space-2)',
-                    textDecoration: 'none',
                   }}
                 >
                   {item.icon}
-                  {item.label}
+                  <span>{item.label}</span>
                 </Link>
               </li>
             )

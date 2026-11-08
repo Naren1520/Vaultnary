@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get, post, put},
     Router,
 };
@@ -56,6 +57,18 @@ fn v1_routes() -> Router<AppState> {
             "/workspaces/:workspace_id/members",
             get(workspaces::list_members),
         )
+        .route(
+            "/workspaces/:workspace_id/members",
+            post(workspaces::add_member),
+        )
+        .route(
+            "/workspaces/:workspace_id/members/:user_id",
+            put(workspaces::update_member_role),
+        )
+        .route(
+            "/workspaces/:workspace_id/members/:user_id",
+            delete(workspaces::remove_member),
+        )
         // --- Vault Items ---
         .route("/vault/items", post(vaults::create_item))
         .route("/vault/items", get(vaults::list_items))
@@ -72,7 +85,10 @@ fn v1_routes() -> Router<AppState> {
         .route("/vault/items/:item_id/favorite", delete(vaults::remove_favorite))
         .route("/vault/recent", get(vaults::recent_items))
         .route("/vault/export", post(vaults::export_vault))
-        .route("/vault/import", post(vaults::import_vault))
+        .route(
+            "/vault/import",
+            post(vaults::import_vault).layer(DefaultBodyLimit::max(50 * 1024 * 1024)),
+        )
         // --- Hierarchy ---
         .route("/vault/items/:item_id/children", get(hierarchy::get_children))
         .route("/vault/tree", get(hierarchy::get_tree))

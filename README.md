@@ -68,7 +68,7 @@ Vaultnary/
 │   ├── security/         Argon2id hashing, token generation
 │   ├── application/      (future use-case extraction)
 │   └── persistence/      (future repository abstractions)
-├── migrations/           SQL migration files (000-009)
+├── migrations/           SQL migration files
 ├── deploy/               Dockerfile, compose.yaml, nginx.conf
 ├── tests/                Integration test stubs
 └── docs/                 Full technical documentation
@@ -124,6 +124,10 @@ sqlx migrate run
 cargo run --bin api
 ```
 
+On Windows, run `dev.bat` or prepend `C:\msys64\mingw64\bin` to `PATH` before
+running Cargo commands. The Rust GNU target uses this MSYS2 toolchain; an older
+MinGW installation earlier on `PATH` can break linking.
+
 ### 5. Start the frontend dev server
 
 ```bash
@@ -144,7 +148,7 @@ Open `http://localhost:5173` — the Vite dev server proxies all `/api/v1/*` req
 cargo test
 ```
 
-48 unit tests — middleware, Argon2id hashing, token generation, credential type validation, cycle detection.
+Rust unit and integration tests cover middleware, authentication, domain validation, and API behavior.
 
 ### Frontend
 
@@ -152,7 +156,7 @@ cargo test
 cd apps/web && npm run test
 ```
 
-20 tests — HTTP client CSRF injection, 401/422/429 response handling.
+Frontend tests cover HTTP client behavior, vault archive validation, and workspace member management.
 
 ---
 

@@ -8,6 +8,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
+use validator::ValidateEmail;
 
 use crate::{
     error::{ApiError, ErrorDetail},
@@ -119,6 +120,47 @@ fn validate_workspace_name(body: &serde_json::Value) -> Result<String, ApiError>
     Ok(name.to_owned())
 }
 
+fn validate_member_email(body: &serde_json::Value) -> Result<String, ApiError> {
+    let email = body
+        .get("email")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
+
+    if email.is_empty() || !email.validate_email() {
+        return Err(ApiError::with_details(
+            AppError::UnprocessableEntity("email: must be a valid email address".into()),
+            vec![ErrorDetail {
+                field: "email".into(),
+                rule: "email".into(),
+            }],
+        ));
+    }
+
+    Ok(email)
+}
+
+fn validate_member_role(body: &serde_json::Value) -> Result<WorkspaceRole, ApiError> {
+    let role = body
+        .get("role")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+
+    match role {
+        "admin" => Ok(WorkspaceRole::Admin),
+        "editor" => Ok(WorkspaceRole::Editor),
+        "viewer" => Ok(WorkspaceRole::Viewer),
+        _ => Err(ApiError::with_details(
+            AppError::UnprocessableEntity("role: must be admin, editor, or viewer".into()),
+            vec![ErrorDetail {
+                field: "role".into(),
+                rule: "workspace_member_role".into(),
+            }],
+        )),
+    }
+}
+
 pub(crate) fn requested_workspace_id(body: &serde_json::Value) -> Result<Option<Uuid>, ApiError> {
     let Some(value) = body.get("workspace_id") else {
         return Ok(None);
@@ -192,6 +234,7 @@ pub async fn create_workspace(
 ) -> Result<impl IntoResponse, ApiError> {
     let name = validate_workspace_name(&body)?;
     let workspace_id = Uuid::new_v4();
+    let vault_id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
     let mut tx = state
         .db()
@@ -221,6 +264,14 @@ pub async fn create_workspace(
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
+        .bind(vault_id)
+        .bind(auth.user_id)
+        .bind(workspace_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     tx.commit()
         .await
@@ -341,9 +392,196 @@ pub async fn list_members(
     Ok(Json(serde_json::json!({ "data": members })))
 }
 
+/// POST /api/v1/workspaces/:workspace_id/members
+pub async fn add_member(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path(workspace_id): Path<Uuid>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    if !actor_role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let email = validate_member_email(&body)?;
+    let role = validate_member_role(&body)?;
+    if actor_role == WorkspaceRole::Admin && role == WorkspaceRole::Admin {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let user_id: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = $1")
+        .bind(&email)
+        .fetch_optional(state.db())
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (user_id,) = user_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+
+    let result = sqlx::query(
+        "INSERT INTO workspace_members (workspace_id, user_id, role)
+         VALUES ($1, $2, $3)",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .bind(role.as_str())
+    .execute(state.db())
+    .await;
+
+    match result {
+        Ok(_) => {}
+        Err(error)
+            if error
+                .as_database_error()
+                .and_then(|database_error| database_error.code())
+                .as_deref()
+                == Some("23505") =>
+        {
+            return Err(ApiError::new(AppError::Conflict(
+                "User is already a workspace member".into(),
+            )));
+        }
+        Err(error) => return Err(ApiError::new(AppError::Internal(error.into()))),
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({
+            "data": {
+                "user_id": user_id,
+                "email": email,
+                "role": role,
+            }
+        })),
+    ))
+}
+
+/// PUT /api/v1/workspaces/:workspace_id/members/:user_id
+pub async fn update_member_role(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((workspace_id, user_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    if !actor_role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let new_role = validate_member_role(&body)?;
+    if actor_role == WorkspaceRole::Admin && new_role == WorkspaceRole::Admin {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let owner_id: Option<(Uuid,)> = sqlx::query_as("SELECT owner_id FROM workspaces WHERE id = $1")
+        .bind(workspace_id)
+        .fetch_optional(state.db())
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (owner_id,) = owner_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if user_id == owner_id {
+        return Err(ApiError::new(AppError::Conflict(
+            "The workspace owner role cannot be changed".into(),
+        )));
+    }
+
+    let target_role: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .fetch_optional(state.db())
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (target_role,) = target_role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if actor_role == WorkspaceRole::Admin && target_role == "admin" {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let result = sqlx::query(
+        "UPDATE workspace_members SET role = $1 WHERE workspace_id = $2 AND user_id = $3",
+    )
+    .bind(new_role.as_str())
+    .bind(workspace_id)
+    .bind(user_id)
+    .execute(state.db())
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+
+    Ok(StatusCode::OK)
+}
+
+/// DELETE /api/v1/workspaces/:workspace_id/members/:user_id
+pub async fn remove_member(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((workspace_id, user_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    if !actor_role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let owner_id: Option<(Uuid,)> = sqlx::query_as("SELECT owner_id FROM workspaces WHERE id = $1")
+        .bind(workspace_id)
+        .fetch_optional(state.db())
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (owner_id,) = owner_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if user_id == owner_id {
+        return Err(ApiError::new(AppError::Conflict(
+            "The workspace owner cannot be removed".into(),
+        )));
+    }
+
+    let target_role: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .fetch_optional(state.db())
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (target_role,) = target_role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if actor_role == WorkspaceRole::Admin && target_role == "admin" {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let result =
+        sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2")
+            .bind(workspace_id)
+            .bind(user_id)
+            .execute(state.db())
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+
+    Ok(StatusCode::OK)
+}
+
+impl WorkspaceRole {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Admin => "admin",
+            Self::Editor => "editor",
+            Self::Viewer => "viewer",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{requested_workspace_id, validate_workspace_name, WorkspaceRole};
+    use super::{
+        requested_workspace_id, validate_member_email, validate_member_role,
+        validate_workspace_name, WorkspaceRole,
+    };
     use uuid::Uuid;
 
     #[test]
@@ -385,5 +623,26 @@ mod tests {
             "workspace_id": 42
         }))
         .is_err());
+    }
+
+    #[test]
+    fn member_email_is_normalized_and_validated() {
+        assert_eq!(
+            validate_member_email(&serde_json::json!({ "email": "  PERSON@example.com " }))
+                .unwrap(),
+            "person@example.com"
+        );
+        assert!(validate_member_email(&serde_json::json!({ "email": "not-an-email" })).is_err());
+        assert!(validate_member_email(&serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn member_role_cannot_be_owner_or_an_unknown_value() {
+        assert_eq!(
+            validate_member_role(&serde_json::json!({ "role": "editor" })).unwrap(),
+            WorkspaceRole::Editor
+        );
+        assert!(validate_member_role(&serde_json::json!({ "role": "owner" })).is_err());
+        assert!(validate_member_role(&serde_json::json!({ "role": "invalid" })).is_err());
     }
 }

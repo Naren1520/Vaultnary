@@ -15,5 +15,5 @@ function InnerLoader() {
         }, children: _jsx(Loader, { size: 64 }) }));
 }
 export default function AppShell() {
-    return (_jsx(ToastProvider, { children: _jsxs("div", { style: { display: 'flex', minHeight: '100vh' }, children: [_jsx(Sidebar, {}), _jsx("main", { id: "main-content", style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }, children: _jsx(ErrorBoundary, { children: _jsx(Suspense, { fallback: _jsx(InnerLoader, {}), children: _jsx(Outlet, {}) }) }) })] }) }));
+    return (_jsx(ToastProvider, { children: _jsxs("div", { className: "app-shell", children: [_jsx(Sidebar, {}), _jsx("main", { id: "main-content", className: "app-main", children: _jsx(ErrorBoundary, { children: _jsx(Suspense, { fallback: _jsx(InnerLoader, {}), children: _jsx(Outlet, {}) }) }) })] }) }));
 }

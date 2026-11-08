@@ -22,7 +22,9 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     let member_id = Uuid::new_v4();
     let invalid_role_user_id = Uuid::new_v4();
     let workspace_id = Uuid::new_v4();
+    let second_workspace_id = Uuid::new_v4();
     let vault_id = Uuid::new_v4();
+    let second_vault_id = Uuid::new_v4();
     let project_id = Uuid::new_v4();
     let service_id = Uuid::new_v4();
 
@@ -47,12 +49,22 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
         .expect("insert workspace");
 
     sqlx::query(
+        "INSERT INTO workspaces (id, name, owner_id) VALUES ($1, 'Second workspace', $2)",
+    )
+    .bind(second_workspace_id)
+    .bind(owner_id)
+    .execute(&mut *tx)
+    .await
+    .expect("insert second workspace");
+
+    sqlx::query(
         "INSERT INTO workspace_members (workspace_id, user_id, role)
-         VALUES ($1, $2, 'owner'), ($1, $3, 'editor')",
+         VALUES ($1, $2, 'owner'), ($1, $3, 'editor'), ($4, $2, 'owner')",
     )
     .bind(workspace_id)
     .bind(owner_id)
     .bind(member_id)
+    .bind(second_workspace_id)
     .execute(&mut *tx)
     .await
     .expect("insert workspace memberships");
@@ -64,6 +76,14 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
         .execute(&mut *tx)
         .await
         .expect("insert workspace vault");
+
+    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
+        .bind(second_vault_id)
+        .bind(owner_id)
+        .bind(second_workspace_id)
+        .execute(&mut *tx)
+        .await
+        .expect("insert second workspace vault");
 
     sqlx::query(
         "INSERT INTO projects (id, owner_id, workspace_id, name) VALUES ($1, $2, $3, 'Project')",
@@ -109,6 +129,22 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .expect("count workspace resources");
     assert_eq!(linked_resources, 3);
 
+    let owner_workspace_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM workspace_members WHERE user_id = $1")
+            .bind(owner_id)
+            .fetch_one(&mut *tx)
+            .await
+            .expect("count workspaces owned by user");
+    assert_eq!(owner_workspace_count, 2);
+
+    let workspace_vault_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM vaults WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&mut *tx)
+            .await
+            .expect("count user workspace vaults");
+    assert_eq!(workspace_vault_count, 2);
+
     let invalid_role = sqlx::query(
         "INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'invalid')",
     )
@@ -118,7 +154,10 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .await
     .expect_err("database must reject unknown workspace roles");
     assert_eq!(
-        invalid_role.as_database_error().and_then(|error| error.code()),
+        invalid_role
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
         Some("23514")
     );
 

@@ -6,6 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::collections::{HashMap, HashSet};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -23,6 +24,7 @@ const MAX_TAG_COUNT: usize = 20;
 const MAX_TAG_LEN: usize = 50;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1024; /* 64 KB */
 const MAX_NOTES_LEN: usize = 10_000;
+const MAX_ARCHIVE_ITEMS: usize = 100_000;
 
 /* Default / maximum page sizes */
 const DEFAULT_LIMIT: i64 = 20;
@@ -52,6 +54,39 @@ struct VaultItemMeta {
 struct InheritedFrom {
     id: Uuid,
     name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct VaultArchive {
+    version: u32,
+    items: Vec<ArchiveItem>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ArchiveItem {
+    id: Uuid,
+    name: String,
+    credential_type: String,
+    parent_item_id: Option<Uuid>,
+    tags: Vec<String>,
+    notes: Option<String>,
+    encrypted_payload: Option<String>,
+    payload_metadata: Option<serde_json::Value>,
+    encrypted_dek: Option<String>,
+}
+
+struct ValidatedArchiveItem {
+    id: Uuid,
+    name: String,
+    credential_type: String,
+    parent_item_id: Option<Uuid>,
+    tags: Vec<String>,
+    notes: Option<String>,
+    encrypted_payload: Option<Vec<u8>>,
+    payload_metadata: Option<serde_json::Value>,
+    encrypted_dek: Option<Vec<u8>>,
 }
 
 /* Shared audit helper (mirrors auth.rs)                               */
@@ -930,30 +965,385 @@ pub async fn recent_items(
     Ok(Json(serde_json::json!({ "data": items })))
 }
 
-/* POST /api/v1/vault/export -501 stub                               */
-
-pub async fn export_vault() -> impl IntoResponse {
-    StatusCode::NOT_IMPLEMENTED
+async fn record_archive_event(
+    db: &PgPool,
+    actor_id: Uuid,
+    action_type: &str,
+) -> Result<(), ApiError> {
+    sqlx::query(
+        "INSERT INTO audit_events (id, actor_id, action_type, resource_type, metadata)
+         VALUES ($1, $2, $3, 'vault', '{}'::jsonb)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(actor_id)
+    .bind(action_type)
+    .execute(db)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    Ok(())
 }
 
-/* POST /api/v1/vault/import -501 stub                               */
+fn archive_validation_error(field: &str, rule: &str) -> ApiError {
+    ApiError::with_details(
+        AppError::UnprocessableEntity("Invalid vault archive".into()),
+        vec![ErrorDetail {
+            field: field.into(),
+            rule: rule.into(),
+        }],
+    )
+}
 
-pub async fn import_vault() -> impl IntoResponse {
-    StatusCode::NOT_IMPLEMENTED
+fn decode_archive_bytes(value: Option<&str>, field: &str) -> Result<Option<Vec<u8>>, ApiError> {
+    value
+        .map(|value| {
+            decode_base64_or_hex(value).ok_or_else(|| archive_validation_error(field, "encoding"))
+        })
+        .transpose()
+}
+
+fn validate_archive(archive: VaultArchive) -> Result<Vec<ValidatedArchiveItem>, ApiError> {
+    if archive.version != 1 {
+        return Err(archive_validation_error("version", "unsupported"));
+    }
+    if archive.items.len() > MAX_ARCHIVE_ITEMS {
+        return Err(archive_validation_error("items", "too_many"));
+    }
+
+    let mut ids = HashSet::with_capacity(archive.items.len());
+    for item in &archive.items {
+        if !ids.insert(item.id) {
+            return Err(archive_validation_error("items.id", "duplicate"));
+        }
+    }
+
+    let parent_ids: HashMap<Uuid, Option<Uuid>> = archive
+        .items
+        .iter()
+        .map(|item| (item.id, item.parent_item_id))
+        .collect();
+    for item in &archive.items {
+        if item
+            .parent_item_id
+            .is_some_and(|parent_id| !parent_ids.contains_key(&parent_id))
+        {
+            return Err(archive_validation_error(
+                "items.parent_item_id",
+                "not_in_archive",
+            ));
+        }
+    }
+
+    let mut finished = HashSet::with_capacity(archive.items.len());
+    for item in &archive.items {
+        let mut path = Vec::new();
+        let mut active = HashSet::new();
+        let mut current = Some(item.id);
+        while let Some(item_id) = current {
+            if finished.contains(&item_id) {
+                break;
+            }
+            if !active.insert(item_id) {
+                return Err(archive_validation_error("items.parent_item_id", "cycle"));
+            }
+            path.push(item_id);
+            current = parent_ids.get(&item_id).copied().flatten();
+        }
+        finished.extend(path);
+    }
+
+    archive
+        .items
+        .into_iter()
+        .map(|item| {
+            let name = item.name.trim().to_owned();
+            if name.is_empty() || name.len() > MAX_NAME_LEN {
+                return Err(archive_validation_error("items.name", "length_1_255"));
+            }
+            if item.tags.len() > MAX_TAG_COUNT {
+                return Err(archive_validation_error("items.tags", "max_20"));
+            }
+            let tags = item
+                .tags
+                .into_iter()
+                .map(|tag| tag.trim().to_owned())
+                .collect::<Vec<_>>();
+            if tags
+                .iter()
+                .any(|tag| tag.is_empty() || tag.len() > MAX_TAG_LEN)
+            {
+                return Err(archive_validation_error("items.tags", "each_max_50_chars"));
+            }
+            if item
+                .notes
+                .as_ref()
+                .is_some_and(|notes| notes.len() > MAX_NOTES_LEN)
+            {
+                return Err(archive_validation_error("items.notes", "max_10000_chars"));
+            }
+
+            let credential_type = CredentialType::from_str(&item.credential_type)
+                .ok_or_else(|| archive_validation_error("items.credential_type", "invalid_enum"))?;
+            if let Some(metadata) = item.payload_metadata.as_ref() {
+                if validate_payload_metadata(&credential_type, metadata).is_err() {
+                    return Err(archive_validation_error(
+                        "items.payload_metadata",
+                        "missing_required_fields",
+                    ));
+                }
+            }
+
+            let encrypted_payload =
+                decode_archive_bytes(item.encrypted_payload.as_deref(), "items.encrypted_payload")?;
+            if encrypted_payload
+                .as_ref()
+                .is_some_and(|payload| payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES)
+            {
+                return Err(archive_validation_error(
+                    "items.encrypted_payload",
+                    "invalid_size",
+                ));
+            }
+            let encrypted_dek =
+                decode_archive_bytes(item.encrypted_dek.as_deref(), "items.encrypted_dek")?;
+            if encrypted_dek
+                .as_ref()
+                .is_some_and(|dek| dek.is_empty() || dek.len() > MAX_PAYLOAD_BYTES)
+            {
+                return Err(archive_validation_error(
+                    "items.encrypted_dek",
+                    "invalid_size",
+                ));
+            }
+            if encrypted_payload.is_some() && encrypted_dek.is_none() {
+                return Err(archive_validation_error(
+                    "items.encrypted_dek",
+                    "required_for_encrypted_payload",
+                ));
+            }
+
+            Ok(ValidatedArchiveItem {
+                id: item.id,
+                name,
+                credential_type: item.credential_type,
+                parent_item_id: item.parent_item_id,
+                tags,
+                notes: item.notes,
+                encrypted_payload,
+                payload_metadata: item.payload_metadata,
+                encrypted_dek,
+            })
+        })
+        .collect()
+}
+
+/// POST /api/v1/vault/export
+pub async fn export_vault(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+) -> Result<impl IntoResponse, ApiError> {
+    let db = state.db();
+    record_archive_event(db, auth.user_id, "export.initiated").await?;
+
+    type ExportRow = (
+        Uuid,
+        Option<Uuid>,
+        String,
+        String,
+        Vec<String>,
+        Option<String>,
+        Option<Vec<u8>>,
+        Option<serde_json::Value>,
+        Option<Vec<u8>>,
+    );
+    let rows: Vec<ExportRow> = sqlx::query_as(
+        "SELECT vi.id, vi.parent_item_id, vi.name, vi.credential_type, vi.tags,
+                vi.notes, vi.encrypted_payload, vi.payload_metadata, cke.encrypted_dek
+         FROM vault_items vi
+         JOIN vaults v ON v.id = vi.vault_id
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $1
+         WHERE v.owner_id = $1
+         ORDER BY vi.created_at, vi.id",
+    )
+    .bind(auth.user_id)
+    .fetch_all(db)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    let mut items = Vec::with_capacity(rows.len());
+    for (
+        id,
+        parent_item_id,
+        name,
+        credential_type,
+        tags,
+        notes,
+        encrypted_payload,
+        payload_metadata,
+        encrypted_dek,
+    ) in rows
+    {
+        if encrypted_payload.is_some() && encrypted_dek.is_none() {
+            return Err(ApiError::new(AppError::Internal(anyhow::anyhow!(
+                "owned vault item is missing its encrypted key envelope"
+            ))));
+        }
+        items.push(ArchiveItem {
+            id,
+            name,
+            credential_type,
+            parent_item_id,
+            tags,
+            notes,
+            encrypted_payload: encrypted_payload.map(hex::encode),
+            payload_metadata,
+            encrypted_dek: encrypted_dek.map(hex::encode),
+        });
+    }
+
+    Ok(Json(serde_json::json!({
+        "data": VaultArchive { version: 1, items }
+    })))
+}
+
+/// POST /api/v1/vault/import
+pub(super) async fn import_vault(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Json(archive): Json<VaultArchive>,
+) -> Result<impl IntoResponse, ApiError> {
+    let db = state.db();
+    record_archive_event(db, auth.user_id, "import.initiated").await?;
+    let items = validate_archive(archive)?;
+
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let vault_id: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM vaults
+         WHERE owner_id = $1
+         ORDER BY created_at, id
+         LIMIT 1
+         FOR UPDATE",
+    )
+    .bind(auth.user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (vault_id,) = vault_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+
+    if !items.is_empty() {
+        let item_ids = items.iter().map(|item| item.id).collect::<Vec<_>>();
+        let duplicate: Option<(Uuid,)> =
+            sqlx::query_as("SELECT id FROM vault_items WHERE id = ANY($1) LIMIT 1")
+                .bind(&item_ids)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+        if duplicate.is_some() {
+            return Err(ApiError::new(AppError::Conflict(
+                "The archive contains items that already exist".into(),
+            )));
+        }
+    }
+
+    let now = OffsetDateTime::now_utc();
+    let imported_count = items.len();
+
+    for item in &items {
+        sqlx::query(
+            "INSERT INTO vault_items
+             (id, vault_id, name, credential_type, parent_item_id, tags,
+              encrypted_payload, payload_metadata, notes, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $9)",
+        )
+        .bind(item.id)
+        .bind(vault_id)
+        .bind(&item.name)
+        .bind(&item.credential_type)
+        .bind(&item.tags)
+        .bind(&item.encrypted_payload)
+        .bind(&item.payload_metadata)
+        .bind(&item.notes)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+        sqlx::query(
+            "INSERT INTO credential_permissions (id, item_id, user_id, role, granted_at)
+             VALUES ($1, $2, $3, 'owner', $4)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(item.id)
+        .bind(auth.user_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+        if let Some(encrypted_dek) = item.encrypted_dek.as_ref() {
+            sqlx::query(
+                "INSERT INTO credential_key_envelopes
+                 (id, item_id, user_id, encrypted_dek, created_at)
+                 VALUES ($1, $2, $3, $4, $5)",
+            )
+            .bind(Uuid::new_v4())
+            .bind(item.id)
+            .bind(auth.user_id)
+            .bind(encrypted_dek)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+        }
+    }
+
+    for item in &items {
+        if let Some(parent_item_id) = item.parent_item_id {
+            sqlx::query(
+                "UPDATE vault_items SET parent_item_id = $1
+                 WHERE id = $2 AND vault_id = $3",
+            )
+            .bind(parent_item_id)
+            .bind(item.id)
+            .bind(vault_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    Ok(Json(serde_json::json!({
+        "data": {
+            "imported": imported_count
+        }
+    })))
 }
 
 /* Utility                                                             */
 
 fn extract_tags(val: &serde_json::Value) -> Vec<String> {
     val.as_array()
-        .map(|arr| arr.iter().filter_map(|t| t.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| t.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
 /// Decode a base64 or hex string to bytes.
 /// Returns None if the input is empty or decoding fails.
 pub(super) fn decode_base64_or_hex(s: &str) -> Option<Vec<u8>> {
-    if s.is_empty() { return None; }
+    if s.is_empty() {
+        return None;
+    }
     // Try hex first (even length, all hex chars)
     if s.len() % 2 == 0 && s.chars().all(|c| c.is_ascii_hexdigit()) {
         return hex::decode(s).ok();
@@ -961,27 +1351,158 @@ pub(super) fn decode_base64_or_hex(s: &str) -> Option<Vec<u8>> {
     // Try base64
     let cleaned = s.replace(['\n', '\r', ' '], "");
     let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-    if !cleaned.chars().all(|c| alphabet.contains(&(c as u8))) {
+    if cleaned.is_empty() || !cleaned.chars().all(|c| alphabet.contains(&(c as u8))) {
         return None;
     }
     let mut table = [255u8; 256];
-    for (i, &c) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".iter().enumerate() {
+    for (i, &c) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        .iter()
+        .enumerate()
+    {
         table[c as usize] = i as u8;
     }
     let bytes = cleaned.as_bytes();
-    if bytes.len() % 4 != 0 { return None; }
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
+    let padding = bytes.iter().rev().take_while(|&&byte| byte == b'=').count();
+    if padding > 2 || bytes[..bytes.len().saturating_sub(padding)].contains(&b'=') {
+        return None;
+    }
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len() / 4 * 3);
-    let mut i = 0;
-    while i < bytes.len() {
-        let a = table[bytes[i] as usize];
-        let b = table[bytes[i+1] as usize];
-        let c = if bytes[i+2] == b'=' { 0 } else { table[bytes[i+2] as usize] };
-        let d = if bytes[i+3] == b'=' { 0 } else { table[bytes[i+3] as usize] };
-        if a == 255 || b == 255 { return None; }
+    for (index, chunk) in bytes.chunks_exact(4).enumerate() {
+        let is_last = index + 1 == bytes.len() / 4;
+        let a = table[chunk[0] as usize];
+        let b = table[chunk[1] as usize];
+        let c_padding = chunk[2] == b'=';
+        let d_padding = chunk[3] == b'=';
+        if (c_padding && !d_padding) || ((!is_last) && (c_padding || d_padding)) {
+            return None;
+        }
+        let c = if c_padding {
+            0
+        } else {
+            table[chunk[2] as usize]
+        };
+        let d = if d_padding {
+            0
+        } else {
+            table[chunk[3] as usize]
+        };
+        if a == 255 || b == 255 {
+            return None;
+        }
+        if (!c_padding && c == 255) || (!d_padding && d == 255) {
+            return None;
+        }
+        if is_last
+            && ((padding == 2 && b & 0x0f != 0) || (padding == 1 && !c_padding && c & 0x03 != 0))
+        {
+            return None;
+        }
         out.push((a << 2) | (b >> 4));
-        if bytes[i+2] != b'=' { out.push((b << 4) | (c >> 2)); }
-        if bytes[i+3] != b'=' { out.push((c << 6) | d); }
-        i += 4;
+        if !c_padding {
+            out.push((b << 4) | (c >> 2));
+        }
+        if !d_padding {
+            out.push((c << 6) | d);
+        }
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod archive_tests {
+    use super::{decode_base64_or_hex, validate_archive, ArchiveItem, VaultArchive};
+    use uuid::Uuid;
+
+    fn archive_item(id: Uuid, parent_item_id: Option<Uuid>) -> ArchiveItem {
+        ArchiveItem {
+            id,
+            name: "Credential".into(),
+            credential_type: "custom".into(),
+            parent_item_id,
+            tags: vec!["backup".into()],
+            notes: None,
+            encrypted_payload: None,
+            payload_metadata: None,
+            encrypted_dek: None,
+        }
+    }
+
+    #[test]
+    fn archive_validation_accepts_valid_hierarchy() {
+        let parent_id = Uuid::new_v4();
+        let archive = VaultArchive {
+            version: 1,
+            items: vec![
+                archive_item(parent_id, None),
+                archive_item(Uuid::new_v4(), Some(parent_id)),
+            ],
+        };
+        assert!(validate_archive(archive).is_ok());
+    }
+
+    #[test]
+    fn archive_validation_rejects_duplicate_ids_and_parent_cycles() {
+        let id = Uuid::new_v4();
+        let duplicate_archive = VaultArchive {
+            version: 1,
+            items: vec![archive_item(id, None), archive_item(id, None)],
+        };
+        assert!(validate_archive(duplicate_archive).is_err());
+
+        let first_id = Uuid::new_v4();
+        let second_id = Uuid::new_v4();
+        let cyclic_archive = VaultArchive {
+            version: 1,
+            items: vec![
+                archive_item(first_id, Some(second_id)),
+                archive_item(second_id, Some(first_id)),
+            ],
+        };
+        assert!(validate_archive(cyclic_archive).is_err());
+    }
+
+    #[test]
+    fn archive_validation_rejects_invalid_ciphertext_and_unknown_path_fields() {
+        let mut item = archive_item(Uuid::new_v4(), None);
+        item.encrypted_payload = Some("not a ciphertext!".into());
+        let archive = VaultArchive {
+            version: 1,
+            items: vec![item],
+        };
+        assert!(validate_archive(archive).is_err());
+
+        let with_path = serde_json::json!({
+            "version": 1,
+            "items": [],
+            "path": "../../outside"
+        });
+        assert!(serde_json::from_value::<VaultArchive>(with_path).is_err());
+    }
+
+    #[test]
+    fn archive_validation_rejects_missing_parent_and_unsupported_version() {
+        let archive = VaultArchive {
+            version: 1,
+            items: vec![archive_item(Uuid::new_v4(), Some(Uuid::new_v4()))],
+        };
+        assert!(validate_archive(archive).is_err());
+
+        let archive = VaultArchive {
+            version: 2,
+            items: Vec::new(),
+        };
+        assert!(validate_archive(archive).is_err());
+    }
+
+    #[test]
+    fn archive_byte_decoder_rejects_malformed_base64_padding() {
+        assert_eq!(decode_base64_or_hex("AQID"), Some(vec![1, 2, 3]));
+        assert_eq!(decode_base64_or_hex("AQ=="), Some(vec![1]));
+        assert!(decode_base64_or_hex("A===").is_none());
+        assert!(decode_base64_or_hex("AQ=Z").is_none());
+        assert!(decode_base64_or_hex("AR==").is_none());
+    }
 }

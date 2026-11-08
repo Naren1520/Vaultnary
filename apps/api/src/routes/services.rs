@@ -12,7 +12,8 @@ use crate::{
     error::{ApiError, ErrorDetail},
     middleware::auth::AuthUser,
     routes::workspaces::{
-        default_workspace_id, require_workspace_editor, workspace_member_role,
+        default_workspace_id, requested_workspace_id, require_workspace_editor,
+        workspace_member_role,
     },
     state::AppState,
 };
@@ -86,6 +87,7 @@ pub async fn create_service(
 ) -> Result<impl IntoResponse, ApiError> {
     let (name, description, environment, project_id) = validate_service_fields(&body)?;
     let db = state.db();
+    let requested_workspace_id = requested_workspace_id(&body)?;
 
     let workspace_id = if let Some(pid) = project_id {
         let project_workspace: Option<(Uuid,)> = sqlx::query_as(
@@ -98,11 +100,20 @@ pub async fn create_service(
         .fetch_optional(db)
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-        project_workspace
+        let project_workspace = project_workspace
             .map(|(workspace_id,)| workspace_id)
-            .ok_or_else(|| ApiError::new(AppError::NotFound))?
+            .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+        if requested_workspace_id.is_some_and(|workspace_id| workspace_id != project_workspace) {
+            return Err(ApiError::new(AppError::Conflict(
+                "The selected project belongs to a different workspace".into(),
+            )));
+        }
+        project_workspace
     } else {
-        default_workspace_id(db, auth.user_id).await?
+        match requested_workspace_id {
+            Some(workspace_id) => workspace_id,
+            None => default_workspace_id(db, auth.user_id).await?,
+        }
     };
     require_workspace_editor(db, workspace_id, auth.user_id).await?;
 
@@ -350,4 +361,46 @@ pub async fn service_credentials(
     struct CredItem { id: Uuid, name: String, credential_type: String }
     let items: Vec<CredItem> = rows.into_iter().map(|(id, name, ct)| CredItem { id, name, credential_type: ct }).collect();
     Ok(Json(serde_json::json!({ "data": items })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_service_fields;
+
+    fn valid_service() -> serde_json::Value {
+        serde_json::json!({
+            "name": "API",
+            "environment": "development"
+        })
+    }
+
+    #[test]
+    fn service_validation_accepts_optional_project_and_description() {
+        let body = serde_json::json!({
+            "name": " API ",
+            "description": "Internal API",
+            "environment": "production",
+            "project_id": null
+        });
+        let (name, description, environment, project_id) =
+            validate_service_fields(&body).unwrap();
+        assert_eq!(name, "API");
+        assert_eq!(description.as_deref(), Some("Internal API"));
+        assert_eq!(environment, "production");
+        assert_eq!(project_id, None);
+    }
+
+    #[test]
+    fn service_validation_rejects_invalid_environment_and_project_id() {
+        let mut body = valid_service();
+        body["environment"] = serde_json::json!("qa");
+        assert!(validate_service_fields(&body).is_err());
+
+        body["environment"] = serde_json::json!("development");
+        body["project_id"] = serde_json::json!("not-a-uuid");
+        assert!(validate_service_fields(&body).is_err());
+
+        body["project_id"] = serde_json::json!(42);
+        assert!(validate_service_fields(&body).is_err());
+    }
 }

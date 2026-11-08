@@ -24,26 +24,21 @@ export default function Topbar({
 
   return (
     <header
+      className="app-topbar"
       style={{
-        height: '3rem',
         borderBottom: 'var(--border-card)',
         backgroundColor: 'var(--color-bg)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 var(--space-4)',
-        gap: 'var(--space-4)',
-        flexShrink: 0,
       }}
     >
       {breadcrumbs.length > 0 && (
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="topbar-breadcrumbs">
           <Breadcrumbs items={breadcrumbs} />
         </div>
       )}
 
       {/* Built-in global search (shown by default, can be overridden) */}
       {showSearch && !searchSlot && (
-        <div style={{ flexShrink: 0 }}>
+        <div className="topbar-search">
           <Suspense fallback={<SearchPlaceholder />}>
             <GlobalSearch query={query} onQueryChange={setQuery} />
           </Suspense>
@@ -51,20 +46,13 @@ export default function Topbar({
       )}
 
       {searchSlot && (
-        <div style={{ flexShrink: 0 }}>
+        <div className="topbar-search">
           {searchSlot}
         </div>
       )}
 
       {actionsSlot && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            flexShrink: 0,
-          }}
-        >
+        <div className="topbar-actions">
           {actionsSlot}
         </div>
       )}
@@ -81,7 +69,7 @@ function SearchPlaceholder() {
       disabled
       aria-label="Search vault"
       style={{
-        width: '16rem',
+        width: 'min(16rem, 100%)',
         padding: 'var(--space-1) var(--space-3)',
         border: 'var(--border-input)',
         borderRadius: 'var(--radius-md)',

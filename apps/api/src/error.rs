@@ -19,6 +19,7 @@ struct ErrorBody {
     details: Vec<ErrorDetail>,
 }
 
+#[derive(Debug)]
 pub struct ApiError {
     pub inner: AppError,
     pub details: Vec<ErrorDetail>,

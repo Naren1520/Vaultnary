@@ -1,6 +1,7 @@
 @echo off
 title Vaultnary Dev
 cd /d "%~dp0"
+set "PATH=C:\msys64\mingw64\bin;%PATH%"
 
 echo.
 echo  Vaultnary - Starting development environment

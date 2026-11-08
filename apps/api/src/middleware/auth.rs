@@ -47,6 +47,24 @@ impl<S> Layer<S> for AuthSessionLayer {
     }
 }
 
+pub(crate) fn is_public_path(path: &str) -> bool {
+    matches!(
+        path,
+        "/api/v1/health"
+            | "/api/v1/auth/register"
+            | "/api/v1/auth/verify-email"
+            | "/api/v1/auth/resend-verification"
+            | "/api/v1/auth/login"
+            | "/api/v1/auth/forgot-password"
+            | "/api/v1/auth/reset-password"
+            | "/api/v1/auth/recover"
+            | "/api/v1/dev/verify-email"
+            | "/api/v1/dev/reset-password"
+    ) || path
+        .strip_prefix("/api/v1/auth/public-keys/")
+        .is_some_and(|user_id| Uuid::parse_str(user_id).is_ok())
+}
+
 /// The Tower service that performs session validation.
 #[derive(Clone, Debug)]
 pub struct AuthSessionMiddleware<S> {
@@ -72,13 +90,15 @@ where
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
+            if is_public_path(req.uri().path()) {
+                return inner.call(req).await;
+            }
+
             // Extract the vault_session cookie value.
             let token = match extract_session_cookie(&req) {
                 Some(t) => t,
                 None => {
-                    // No session cookie -pass through without populating AuthUser.
-                    // Route handlers that require auth will reject the request.
-                    return inner.call(req).await;
+                    return Ok(unauthorized_response());
                 }
             };
 
@@ -214,6 +234,50 @@ fn internal_error_response() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::Body;
+    use std::convert::Infallible;
+    use tower::ServiceExt;
+
+    fn test_service() -> impl Service<Request<Body>, Response = Response, Error = Infallible> + Clone
+    {
+        let db = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://test:test@localhost/test")
+            .expect("valid test database URL");
+        AuthSessionLayer::new(db).layer(tower::service_fn(|_| async {
+            Ok::<_, Infallible>(Response::new(Body::empty()))
+        }))
+    }
+
+    #[tokio::test]
+    async fn protected_request_without_session_returns_401() {
+        let response = test_service()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/workspaces")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(response.headers().contains_key(header::SET_COOKIE));
+    }
+
+    #[tokio::test]
+    async fn public_request_without_session_reaches_handler() {
+        let response = test_service()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 
     #[test]
     fn hash_token_is_deterministic() {
