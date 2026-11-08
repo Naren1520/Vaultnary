@@ -30,6 +30,10 @@ pub async fn run() -> anyhow::Result<()> {
         .await?;
     info!("Connected to PostgreSQL");
 
+    info!("Applying pending database migrations");
+    sqlx::migrate!("../../migrations").run(&db).await?;
+    info!("Database migrations are up to date");
+
     let state = AppState::new(db.clone(), config.clone());
 
     let cors_origin = std::env::var("CORS_ORIGIN")

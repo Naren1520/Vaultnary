@@ -117,6 +117,9 @@ On Windows, after configuring `.env` and installing frontend dependencies, run
 and frontend in separate windows. PostgreSQL must be reachable using
 `DATABASE_URL` from `.env`; skip the manual startup steps below.
 
+The API also applies any pending migrations at startup. This ensures a new
+Render PostgreSQL database is initialized when the API service deploys.
+
 ### 3. Run database migrations
 
 ```bash
