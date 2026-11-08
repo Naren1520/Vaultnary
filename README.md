@@ -112,6 +112,11 @@ openssl rand -hex 32
 docker compose -f deploy/compose.yaml up postgres redis -d
 ```
 
+On Windows, after configuring `.env` and installing frontend dependencies, run
+`dev.bat` from the repository root. It applies migrations and starts the API
+and frontend in separate windows. PostgreSQL must be reachable using
+`DATABASE_URL` from `.env`; skip the manual startup steps below.
+
 ### 3. Run database migrations
 
 ```bash
@@ -124,9 +129,9 @@ sqlx migrate run
 cargo run --bin api
 ```
 
-On Windows, run `dev.bat` or prepend `C:\msys64\mingw64\bin` to `PATH` before
-running Cargo commands. The Rust GNU target uses this MSYS2 toolchain; an older
-MinGW installation earlier on `PATH` can break linking.
+The Rust GNU target on Windows uses the MSYS2 toolchain. If running Cargo
+manually, prepend `C:\msys64\mingw64\bin` to `PATH`; an older MinGW
+installation earlier on `PATH` can break linking.
 
 ### 5. Start the frontend dev server
 

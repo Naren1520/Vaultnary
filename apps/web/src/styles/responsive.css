@@ -6,13 +6,19 @@
 }
 
 .app-sidebar {
+  position: sticky;
+  top: 0;
   display: flex;
   width: var(--sidebar-width);
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   flex: 0 0 var(--sidebar-width);
+  align-self: flex-start;
   flex-direction: column;
   padding: var(--space-4) 0;
+  overflow-y: auto;
   border-right: var(--border-card);
   background-color: var(--color-bg-subtle);
 }
