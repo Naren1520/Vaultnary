@@ -28,11 +28,12 @@ pub struct AuthUser {
 #[derive(Clone, Debug)]
 pub struct AuthSessionLayer {
     db: PgPool,
+    secure_cookie: bool,
 }
 
 impl AuthSessionLayer {
-    pub fn new(db: PgPool) -> Self {
-        Self { db }
+    pub fn new(db: PgPool, secure_cookie: bool) -> Self {
+        Self { db, secure_cookie }
     }
 }
 
@@ -43,6 +44,7 @@ impl<S> Layer<S> for AuthSessionLayer {
         AuthSessionMiddleware {
             inner,
             db: self.db.clone(),
+            secure_cookie: self.secure_cookie,
         }
     }
 }
@@ -70,6 +72,7 @@ pub(crate) fn is_public_path(path: &str) -> bool {
 pub struct AuthSessionMiddleware<S> {
     inner: S,
     db: PgPool,
+    secure_cookie: bool,
 }
 
 impl<S> Service<Request<Body>> for AuthSessionMiddleware<S>
@@ -88,6 +91,7 @@ where
     fn call(&mut self, mut req: Request<Body>) -> Self::Future {
         let db = self.db.clone();
         let mut inner = self.inner.clone();
+        let secure_cookie = self.secure_cookie;
 
         Box::pin(async move {
             if is_public_path(req.uri().path()) {
@@ -98,7 +102,7 @@ where
             let token = match extract_session_cookie(&req) {
                 Some(t) => t,
                 None => {
-                    return Ok(unauthorized_response());
+                    return Ok(unauthorized_response(secure_cookie));
                 }
             };
 
@@ -114,7 +118,7 @@ where
                 }
                 Ok(None) => {
                     // Invalid, expired, or revoked session -return 401 and clear cookie.
-                    Ok(unauthorized_response())
+                    Ok(unauthorized_response(secure_cookie))
                 }
                 Err(err) => {
                     tracing::error!(%err, "Database error during session validation");
@@ -188,14 +192,18 @@ async fn lookup_session(db: &PgPool, token_hash: &str) -> anyhow::Result<Option<
 }
 
 /// Build the 401 Unauthorized response that also clears the session cookie.
-fn unauthorized_response() -> Response {
+fn unauthorized_response(secure: bool) -> Response {
     #[derive(Serialize)]
     struct Body {
         error: &'static str,
     }
 
-    let clear_cookie =
-        HeaderValue::from_static("vault_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+    let same_site = if secure { "None" } else { "Strict" };
+    let secure_attribute = if secure { "; Secure" } else { "" };
+    let clear_cookie = HeaderValue::from_str(&format!(
+        "vault_session=; Path=/; HttpOnly; SameSite={same_site}; Max-Age=0{secure_attribute}"
+    ))
+    .expect("session cookie clearing header is valid");
 
     let mut resp = (
         StatusCode::UNAUTHORIZED,
@@ -243,7 +251,7 @@ mod tests {
         let db = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://test:test@localhost/test")
             .expect("valid test database URL");
-        AuthSessionLayer::new(db).layer(tower::service_fn(|_| async {
+        AuthSessionLayer::new(db, false).layer(tower::service_fn(|_| async {
             Ok::<_, Infallible>(Response::new(Body::empty()))
         }))
     }
@@ -328,11 +336,21 @@ mod tests {
 
     #[test]
     fn unauthorized_response_clears_cookie() {
-        let resp = unauthorized_response();
+        let resp = unauthorized_response(false);
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         let set_cookie = resp.headers().get(header::SET_COOKIE).unwrap();
         let v = set_cookie.to_str().unwrap();
         assert!(v.contains("vault_session="));
         assert!(v.contains("Max-Age=0"));
+        assert!(v.contains("SameSite=Strict"));
+    }
+
+    #[test]
+    fn production_unauthorized_response_clears_cross_site_cookie() {
+        let resp = unauthorized_response(true);
+        let set_cookie = resp.headers().get(header::SET_COOKIE).unwrap();
+        let v = set_cookie.to_str().unwrap();
+        assert!(v.contains("SameSite=None"));
+        assert!(v.contains("Secure"));
     }
 }

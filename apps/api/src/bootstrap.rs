@@ -64,7 +64,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let app = api_router()
         .layer(CsrfGuardLayer)
-        .layer(AuthSessionLayer::new(db))
+        .layer(AuthSessionLayer::new(db, !config.is_development()))
         .layer(RateLimitLayer::new(
             rate_store,
             RateLimitConfig {

@@ -105,16 +105,19 @@ fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-fn clear_session_cookie() -> HeaderValue {
-    HeaderValue::from_static(
-        "vault_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
-    )
+fn clear_session_cookie(secure: bool) -> HeaderValue {
+    let same_site = if secure { "None" } else { "Strict" };
+    let secure_attribute = if secure { "; Secure" } else { "" };
+    HeaderValue::from_str(&format!(
+        "vault_session=; Path=/; HttpOnly; SameSite={same_site}; Max-Age=0{secure_attribute}"
+    ))
+    .expect("session cookie clearing header is valid")
 }
 
 fn build_session_cookie(token: &str, secure: bool) -> String {
+    let same_site = if secure { "None" } else { "Strict" };
     let base = format!(
-        "vault_session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000",
-        token
+        "vault_session={token}; Path=/; HttpOnly; SameSite={same_site}; Max-Age=2592000"
     );
     if secure { format!("{base}; Secure") } else { base }
 }
@@ -449,6 +452,7 @@ pub async fn logout(
     auth: axum::Extension<AuthUser>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
+    let secure = !state.config().is_development();
 
     sqlx::query("UPDATE auth_sessions SET revoked = true WHERE id = $1")
         .bind(auth.session_id)
@@ -459,7 +463,9 @@ pub async fn logout(
     insert_audit(db, auth.user_id, "user.logout", None, None, None, serde_json::json!({})).await;
 
     let mut response = StatusCode::OK.into_response();
-    response.headers_mut().insert(header::SET_COOKIE, clear_session_cookie());
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, clear_session_cookie(secure));
     Ok(response)
 }
 
@@ -772,3 +778,29 @@ pub async fn public_keys(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{build_session_cookie, clear_session_cookie};
+
+    #[test]
+    fn production_session_cookie_allows_cross_site_https_requests() {
+        let cookie = build_session_cookie("session-token", true);
+        assert!(cookie.contains("SameSite=None"));
+        assert!(cookie.contains("Secure"));
+    }
+
+    #[test]
+    fn development_session_cookie_remains_localhost_compatible() {
+        let cookie = build_session_cookie("session-token", false);
+        assert!(cookie.contains("SameSite=Strict"));
+        assert!(!cookie.contains("Secure"));
+    }
+
+    #[test]
+    fn clearing_cookie_uses_matching_production_attributes() {
+        let cookie = clear_session_cookie(true).to_str().unwrap().to_owned();
+        assert!(cookie.contains("SameSite=None"));
+        assert!(cookie.contains("Secure"));
+        assert!(cookie.contains("Max-Age=0"));
+    }
+}
