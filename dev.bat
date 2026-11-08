@@ -5,6 +5,7 @@ cd /d "%~dp0"
 if errorlevel 1 goto :fail
 
 set "PATH=C:\msys64\mingw64\bin;%PATH%"
+set "RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu"
 
 echo.
 echo  Vaultnary - Starting development environment

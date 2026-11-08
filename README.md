@@ -130,8 +130,9 @@ cargo run --bin api
 ```
 
 The Rust GNU target on Windows uses the MSYS2 toolchain. If running Cargo
-manually, prepend `C:\msys64\mingw64\bin` to `PATH`; an older MinGW
-installation earlier on `PATH` can break linking.
+manually, set `RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu` and prepend
+`C:\msys64\mingw64\bin` to `PATH`; an older MinGW installation earlier on
+`PATH` can break linking.
 
 ### 5. Start the frontend dev server
 
