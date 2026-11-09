@@ -1,5 +1,4 @@
 import { ArrowRight, Check, Fingerprint, KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import PublicSiteLayout from './PublicSiteLayout'
 
 const principles = [

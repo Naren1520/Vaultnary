@@ -105,13 +105,28 @@ export default function LandingPage() {
     )
     revealElements.forEach((element) => observer.observe(element))
 
-    const updateNavigation = () => setNavSolid(window.scrollY > 16)
+    const preview = document.querySelector<HTMLElement>('.lp-preview')
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let scrollFrame = 0
+    const updateNavigation = () => {
+      if (scrollFrame) return
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = 0
+        const scrollY = window.scrollY
+        setNavSolid(scrollY > 16)
+        if (preview && !reduceMotion) {
+          preview.style.setProperty('--lp-preview-shift', `${-Math.min(scrollY * 0.08, 32)}px`)
+        }
+      })
+    }
+
     updateNavigation()
     window.addEventListener('scroll', updateNavigation, { passive: true })
 
     return () => {
       observer.disconnect()
       window.removeEventListener('scroll', updateNavigation)
+      if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
       document.documentElement.classList.remove('lp-hide-scrollbar')
       document.body.classList.remove('lp-hide-scrollbar')
     }
@@ -123,6 +138,7 @@ export default function LandingPage() {
         <div className="lp-container lp-nav__inner">
           <Link to="/" className="lp-brand" aria-label="Vaultnary home">
             <img src={logoUrl} alt="Vaultnary" />
+            <span aria-hidden="true">vaultnary</span>
           </Link>
           <nav className="lp-nav__links" aria-label="Main navigation">
             <a href="#product">Product</a>
@@ -192,7 +208,7 @@ export default function LandingPage() {
 
             <div className="lp-feature-grid">
               {features.map(({ icon: Icon, title, body, detail }, index) => (
-                <article className="lp-feature-card lp-reveal" key={title}>
+                <article className="lp-feature-card lp-reveal lp-reveal--zoom" key={title}>
                   <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
                   <span className="lp-feature-card__number">0{index + 1}</span>
                   <h3>{title}</h3>
@@ -217,7 +233,7 @@ export default function LandingPage() {
 
             <div className="lp-structure__grid">
               {workspaceLevels.map(({ icon: Icon, number, title, body }) => (
-                <article className="lp-structure-card lp-reveal" key={title}>
+                <article className="lp-structure-card lp-reveal lp-reveal--from-side" key={title}>
                   <div className="lp-structure-card__top">
                     <span className="lp-structure-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
                     <span>{number}</span>
@@ -262,7 +278,7 @@ export default function LandingPage() {
 
         <section id="security" className="lp-security">
           <div className="lp-container lp-security__inner">
-            <div className="lp-security__visual lp-reveal" aria-hidden="true">
+            <div className="lp-security__visual lp-reveal lp-reveal--zoom" aria-hidden="true">
               <div className="lp-security__halo"><Fingerprint size={54} strokeWidth={1.2} /></div>
               <span className="lp-security__orbit lp-security__orbit--one" />
               <span className="lp-security__orbit lp-security__orbit--two" />
