@@ -77,8 +77,8 @@ The browser is the only trusted zone for secret-value operations. The server and
 - Cookie is `HttpOnly` (not accessible via JavaScript)
 - Cookie is `SameSite=Strict` (not sent on cross-origin requests)
 - Cookie has `Secure` attribute in production (HTTPS only)
-- Session token is a 128-bit random value — brute-force infeasible
-- Token is stored as SHA-256 hash server-side — even if the hash is leaked, the raw token cannot be recovered without preimage attack on SHA-256
+- Session token is a 128-bit random value - brute-force infeasible
+- Token is stored as SHA-256 hash server-side - even if the hash is leaked, the raw token cannot be recovered without preimage attack on SHA-256
 - Sessions can be revoked individually or in bulk from the Security Center
 
 ### TH-03: CSRF attack
@@ -96,7 +96,7 @@ The browser is the only trusted zone for secret-value operations. The server and
 **Risk:** Attacker probes whether an email address has an account.
 **Mitigation:**
 - `POST /auth/register` returns the same 200 response whether the email exists or not
-- `POST /auth/login` executes a full dummy Argon2id hash when the email is not found — this equalises response time
+- `POST /auth/login` executes a full dummy Argon2id hash when the email is not found - this equalises response time
 - `POST /auth/forgot-password` executes a full dummy Argon2id hash when the email is not found
 - `POST /auth/resend-verification` returns 200 regardless
 
@@ -111,10 +111,10 @@ The browser is the only trusted zone for secret-value operations. The server and
 ### TH-08: XSS leads to key extraction
 **Risk:** Attacker injects JavaScript that reads the Zustand store and exfiltrates the private KEK.
 **Mitigation:**
-- Content-Security-Policy set by nginx: `script-src 'self'` — external scripts are blocked
+- Content-Security-Policy set by nginx: `script-src 'self'` - external scripts are blocked
 - CSRF token is in-memory Zustand state, not localStorage/sessionStorage
 - `HttpOnly` cookie cannot be read by JavaScript
-- The private key is a `CryptoKey` object with `extractable: false` — it cannot be exported by `exportKey()` (only the recovery path uses PKCS#8 export deliberately)
+- The private key is a `CryptoKey` object with `extractable: false` - it cannot be exported by `exportKey()` (only the recovery path uses PKCS#8 export deliberately)
 **Residual risk:** `extractable: false` prevents `exportKey()` but does NOT prevent a compromised JavaScript context from calling `decrypt()` directly using the key reference.
 
 ### TH-09: Supply chain attack on frontend dependencies

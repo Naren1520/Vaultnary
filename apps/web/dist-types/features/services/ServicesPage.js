@@ -11,7 +11,7 @@ const environments = ['development', 'staging', 'production', 'custom'];
 const columns = [
     { key: 'name', header: 'Name', sortable: true, render: (r) => _jsx("span", { style: { fontWeight: 'var(--font-weight-medium)' }, children: r.name }) },
     { key: 'environment', header: 'Environment', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.environment }), width: '8rem' },
-    { key: 'description', header: 'Description', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.description ?? '—' }) },
+    { key: 'description', header: 'Description', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.description ?? '-' }) },
 ];
 export default function ServicesPage() {
     const navigate = useNavigate();

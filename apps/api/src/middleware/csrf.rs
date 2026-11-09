@@ -55,12 +55,12 @@ where
                 return inner.call(req).await;
             }
 
-            // Public auth endpoints never require CSRF — they create or reset sessions.
+            // Public auth endpoints never require CSRF - they create or reset sessions.
             if is_public_path(req.uri().path()) {
                 return inner.call(req).await;
             }
 
-            // If there is no AuthUser extension the request is unauthenticated —
+            // If there is no AuthUser extension the request is unauthenticated -
             // let auth middleware handle it.
             let auth_user = match req.extensions().get::<AuthUser>() {
                 Some(u) => u.clone(),

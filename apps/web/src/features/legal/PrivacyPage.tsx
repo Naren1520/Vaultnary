@@ -5,7 +5,7 @@ const sections: LegalSection[] = [
     id: 'scope',
     title: 'Who operates Vaultnary',
     paragraphs: [
-      'Vaultnary is operated by [Vaultnary operator legal name and address — to be completed]. This Privacy Notice explains what information the current service processes, why it is used, and how to contact us about it.',
+      'Vaultnary is operated by [Vaultnary operator legal name and address - to be completed]. This Privacy Notice explains what information the current service processes, why it is used, and how to contact us about it.',
       'This notice describes the current application and deployment as of the date above. It should be reviewed and updated whenever the service, its providers, or its data practices change.',
     ],
   },

@@ -8,7 +8,7 @@ pub async fn send_verification_email(to: &str, token: &str, frontend_url: &str) 
         _ => {
             info!(
                 to = to,
-                "RESEND_API_KEY not set — verification token (dev only, never log in prod): {}",
+                "RESEND_API_KEY not set - verification token (dev only, never log in prod): {}",
                 token
             );
             return;
@@ -70,7 +70,7 @@ pub async fn send_password_reset_email(to: &str, token: &str, frontend_url: &str
         _ => {
             info!(
                 to = to,
-                "RESEND_API_KEY not set — reset token (dev only): {}",
+                "RESEND_API_KEY not set - reset token (dev only): {}",
                 token
             );
             return;

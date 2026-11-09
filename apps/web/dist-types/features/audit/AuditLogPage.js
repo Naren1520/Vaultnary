@@ -7,8 +7,8 @@ import EmptyState from '../../components/feedback/EmptyState';
 import { apiGet } from '../../services/http-client';
 const columns = [
     { key: 'action_type', header: 'Action', sortable: true, render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }, children: r.action_type }) },
-    { key: 'resource_type', header: 'Resource', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.resource_type ?? '—' }), width: '8rem' },
-    { key: 'ip_address', header: 'IP', render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: r.ip_address ?? '—' }), width: '9rem' },
+    { key: 'resource_type', header: 'Resource', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.resource_type ?? '-' }), width: '8rem' },
+    { key: 'ip_address', header: 'IP', render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: r.ip_address ?? '-' }), width: '9rem' },
     { key: 'created_at', header: 'Time', sortable: true, render: (r) => _jsx("span", { style: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: new Date(r.created_at).toLocaleString() }), width: '11rem' },
 ];
 export default function AuditLogPage() {

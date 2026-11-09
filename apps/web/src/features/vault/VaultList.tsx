@@ -52,7 +52,7 @@ const columns: Column<VaultItem>[] = [
           {new Date(row.last_accessed_at).toLocaleDateString()}
         </span>
       ) : (
-        <span style={{ color: 'var(--color-border)' }}>—</span>
+        <span style={{ color: 'var(--color-border)' }}>-</span>
       ),
     width: '9rem',
   },

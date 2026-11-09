@@ -16,8 +16,8 @@ interface AuditEvent {
 
 const columns: Column<AuditEvent>[] = [
   { key: 'action_type', header: 'Action', sortable: true, render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{r.action_type}</span> },
-  { key: 'resource_type', header: 'Resource', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.resource_type ?? '—'}</span>, width: '8rem' },
-  { key: 'ip_address', header: 'IP', render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{r.ip_address ?? '—'}</span>, width: '9rem' },
+  { key: 'resource_type', header: 'Resource', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.resource_type ?? '-'}</span>, width: '8rem' },
+  { key: 'ip_address', header: 'IP', render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{r.ip_address ?? '-'}</span>, width: '9rem' },
   { key: 'created_at', header: 'Time', sortable: true, render: (r) => <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.created_at).toLocaleString()}</span>, width: '11rem' },
 ]
 

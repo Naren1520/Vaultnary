@@ -145,7 +145,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` — the Vite dev server proxies all `/api/v1/*` requests to the backend automatically.
+Open `http://localhost:5173` - the Vite dev server proxies all `/api/v1/*` requests to the backend automatically.
 
 ---
 
@@ -195,12 +195,12 @@ Frontend tests cover HTTP client behavior, vault archive validation, and workspa
 
 ## Security
 
-Security vulnerabilities must be reported privately — do **not** open a public issue.
+Security vulnerabilities must be reported privately - do **not** open a public issue.
 See [SECURITY.md](SECURITY.md) for the responsible disclosure process.
 
 Dependency scanning runs on every pull request:
-- `cargo audit` — Rust dependency CVE scan
-- `npm audit --audit-level=high` — Node dependency scan
+- `cargo audit` - Rust dependency CVE scan
+- `npm audit --audit-level=high` - Node dependency scan
 
 ---
 

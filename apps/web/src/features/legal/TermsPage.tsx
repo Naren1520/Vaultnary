@@ -5,7 +5,7 @@ const sections: LegalSection[] = [
     id: 'agreement',
     title: 'Agreement and the service',
     paragraphs: [
-      'These terms apply when you access or use Vaultnary. The service is operated by [Vaultnary operator legal name and address — to be completed] (“Vaultnary”, “we”, “us”). By creating an account or using the service, you agree to these terms.',
+      'These terms apply when you access or use Vaultnary. The service is operated by [Vaultnary operator legal name and address - to be completed] (“Vaultnary”, “we”, “us”). By creating an account or using the service, you agree to these terms.',
       'If you use Vaultnary for an organization, you confirm that you are authorized to accept these terms for that organization. “You” then includes both you and the organization.',
     ],
   },

@@ -21,10 +21,10 @@ export default function SecurityCenterPage() {
         setSessions((prev) => prev.filter((s) => s.id !== id));
     }
     const columns = [
-        { key: 'ip_address', header: 'IP Address', render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }, children: r.ip_address ?? '—' }) },
-        { key: 'user_agent', header: 'Device', render: (r) => _jsx("span", { style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }, children: r.user_agent ?? '—' }) },
+        { key: 'ip_address', header: 'IP Address', render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }, children: r.ip_address ?? '-' }) },
+        { key: 'user_agent', header: 'Device', render: (r) => _jsx("span", { style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }, children: r.user_agent ?? '-' }) },
         { key: 'created_at', header: 'Created', sortable: true, render: (r) => _jsx("span", { style: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: new Date(r.created_at).toLocaleString() }), width: '10rem' },
-        { key: 'last_used_at', header: 'Last used', render: (r) => _jsx("span", { style: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: r.last_used_at ? new Date(r.last_used_at).toLocaleString() : '—' }), width: '10rem' },
+        { key: 'last_used_at', header: 'Last used', render: (r) => _jsx("span", { style: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: r.last_used_at ? new Date(r.last_used_at).toLocaleString() : '-' }), width: '10rem' },
         {
             key: 'actions', header: '', width: '6rem',
             render: (r) => (_jsx("button", { onClick: (e) => { e.stopPropagation(); void revokeSession(r.id); }, style: { fontSize: 'var(--text-xs)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-sm)', padding: '2px var(--space-2)', backgroundColor: 'transparent', cursor: 'pointer' }, children: "Revoke" })),

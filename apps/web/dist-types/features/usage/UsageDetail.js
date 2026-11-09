@@ -8,12 +8,12 @@ const columns = [
     {
         key: 'target',
         header: 'Linked to',
-        render: (r) => (_jsx("span", { style: { fontSize: 'var(--text-sm)' }, children: r.project_id ? `Project: ${r.project_id}` : r.service_id ? `Service: ${r.service_id}` : '—' })),
+        render: (r) => (_jsx("span", { style: { fontSize: 'var(--text-sm)' }, children: r.project_id ? `Project: ${r.project_id}` : r.service_id ? `Service: ${r.service_id}` : '-' })),
     },
     {
         key: 'notes',
         header: 'Notes',
-        render: (r) => (_jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.notes ?? '—' })),
+        render: (r) => (_jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.notes ?? '-' })),
     },
     {
         key: 'created_at',

@@ -34,7 +34,7 @@ export default function SecurityOverviewPage() {
             <h1>Designed to keep secrets<br />out of reach.</h1>
             <p>
               Sensitive credential fields are encrypted in your browser before they
-              are stored. Learn what that means—and what remains visible to provide
+              are stored. Learn what that means-and what remains visible to provide
               the service.
             </p>
             <span className="security-hero__note">

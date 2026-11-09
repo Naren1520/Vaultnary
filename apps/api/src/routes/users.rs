@@ -89,7 +89,7 @@ pub async fn lookup_user(
     Ok(Json(serde_json::json!({ "data": { "id": id } })))
 }
 
-/// POST /api/v1/dev/verify-email — dev only, force-verifies an email
+/// POST /api/v1/dev/verify-email - dev only, force-verifies an email
 pub async fn dev_verify_email(
     State(state): State<AppState>,
     Json(body): Json<serde_json::Value>,
@@ -113,7 +113,7 @@ pub async fn dev_verify_email(
     Ok(axum::Json(serde_json::json!({ "ok": true, "email": email })))
 }
 
-/// POST /api/v1/dev/reset-password — dev only, reset password directly
+/// POST /api/v1/dev/reset-password - dev only, reset password directly
 pub async fn dev_reset_password(
     State(state): State<AppState>,
     Json(body): Json<serde_json::Value>,

@@ -2,8 +2,8 @@
 
 ## Our Standards
 
-This project is maintained by a single owner. All interactions — issue reports,
-discussions, and any contributions — are expected to be respectful and professional.
+This project is maintained by a single owner. All interactions - issue reports,
+discussions, and any contributions - are expected to be respectful and professional.
 
 Unacceptable behaviour includes:
 

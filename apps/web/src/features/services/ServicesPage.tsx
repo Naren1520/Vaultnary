@@ -35,7 +35,7 @@ const environments = ['development', 'staging', 'production', 'custom'] as const
 const columns: Column<Service>[] = [
   { key: 'name', header: 'Name', sortable: true, render: (r) => <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{r.name}</span> },
   { key: 'environment', header: 'Environment', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.environment}</span>, width: '8rem' },
-  { key: 'description', header: 'Description', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.description ?? '—'}</span> },
+  { key: 'description', header: 'Description', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.description ?? '-'}</span> },
 ]
 
 export default function ServicesPage() {

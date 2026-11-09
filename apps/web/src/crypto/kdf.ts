@@ -3,7 +3,7 @@ import { argon2id } from '@noble/hashes/argon2.js'
 /**
  * Derive a non-extractable AES-256-GCM CryptoKey from a password and salt.
  *
- * Uses @noble/hashes argon2id — pure TypeScript, no WASM required.
+ * Uses @noble/hashes argon2id - pure TypeScript, no WASM required.
  * Parameters match the backend: m=65536 (64 MiB), t=3, p=4, outputLen=32.
  *
  * @param password - user's master password (plaintext)

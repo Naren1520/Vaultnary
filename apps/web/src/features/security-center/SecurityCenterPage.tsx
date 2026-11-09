@@ -25,10 +25,10 @@ export default function SecurityCenterPage() {
   }
 
   const columns: Column<SessionRecord>[] = [
-    { key: 'ip_address', header: 'IP Address', render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{r.ip_address ?? '—'}</span> },
-    { key: 'user_agent', header: 'Device', render: (r) => <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{r.user_agent ?? '—'}</span> },
+    { key: 'ip_address', header: 'IP Address', render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{r.ip_address ?? '-'}</span> },
+    { key: 'user_agent', header: 'Device', render: (r) => <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{r.user_agent ?? '-'}</span> },
     { key: 'created_at', header: 'Created', sortable: true, render: (r) => <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.created_at).toLocaleString()}</span>, width: '10rem' },
-    { key: 'last_used_at', header: 'Last used', render: (r) => <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{r.last_used_at ? new Date(r.last_used_at).toLocaleString() : '—'}</span>, width: '10rem' },
+    { key: 'last_used_at', header: 'Last used', render: (r) => <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{r.last_used_at ? new Date(r.last_used_at).toLocaleString() : '-'}</span>, width: '10rem' },
     {
       key: 'actions', header: '', width: '6rem',
       render: (r) => (

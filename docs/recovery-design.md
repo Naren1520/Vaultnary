@@ -2,7 +2,7 @@
 
 ## The Problem
 
-Vaultnary uses zero-knowledge encryption. Your master password is the root of your entire key hierarchy. If you forget it, the server cannot help you — it does not know your password and cannot decrypt your private key. Without recovery, losing your master password means permanently losing all your credentials.
+Vaultnary uses zero-knowledge encryption. Your master password is the root of your entire key hierarchy. If you forget it, the server cannot help you - it does not know your password and cannot decrypt your private key. Without recovery, losing your master password means permanently losing all your credentials.
 
 Recovery solves this by letting you create an encrypted backup of your private key, protected by a separate recovery passphrase that only you know. The backup is stored on the server but is computationally unreadable without the passphrase.
 
@@ -17,7 +17,7 @@ Recovery solves this by letting you create an encrypted backup of your private k
 | KEK | Key Encryption Key. An RSA-OAEP-4096 key pair. The public key encrypts DEKs; the private key decrypts them. |
 | DEK | Data Encryption Key. A random 256-bit AES key unique to each vault item. Encrypts the item's secret payload. |
 | Recovery passphrase | A separate passphrase (12+ characters) used only for recovery. Completely independent of your master password. |
-| Recovery Key | 256-bit AES-GCM key derived from your recovery passphrase via Argon2id. Never stored — re-derived on demand. |
+| Recovery Key | 256-bit AES-GCM key derived from your recovery passphrase via Argon2id. Never stored - re-derived on demand. |
 | Encrypted private key blob | Your KEK private key encrypted with your Recovery Key. Stored in `recovery_material` on the server. |
 
 ---
@@ -115,7 +115,7 @@ Step 9: Browser imports the private key:
         privateKey = crypto.subtle.importKey('pkcs8', pkcs8Bytes, {name:'RSA-OAEP',hash:'SHA-256'}, false, ['decrypt'])
 
 Step 10: privateKey is stored in Zustand vault-store
-         Vault is now unlocked — user can access all their credentials again
+         Vault is now unlocked - user can access all their credentials again
 
 Step 11: Browser enforces password_change_required:
          User is prompted to set a new master password immediately
@@ -136,9 +136,9 @@ Step 12: User is prompted to run recovery setup again (create a new encrypted bl
 
 ### Recovery CANNOT:
 - Restore access to credentials that were never shared with the user
-- Work without the recovery passphrase — the blob on the server is computationally unreadable without it
-- Bypass the Argon2id computation — re-deriving the key takes ~2-3 seconds per attempt (memory-hard)
-- Recover a vault if BOTH master password AND recovery passphrase are lost — the data is permanently inaccessible
+- Work without the recovery passphrase - the blob on the server is computationally unreadable without it
+- Bypass the Argon2id computation - re-deriving the key takes ~2-3 seconds per attempt (memory-hard)
+- Recover a vault if BOTH master password AND recovery passphrase are lost - the data is permanently inaccessible
 
 ---
 
@@ -160,9 +160,9 @@ The `recovery_material` table stores:
 }
 ```
 
-- `encrypted_private_key`: The full AES-256-GCM output — nonce prepended, auth tag appended
-- `integrity_tag`: The last 16 bytes of the ciphertext — same as the AES-GCM tag. Redundant but makes integrity checking explicit without re-parsing
-- `kdf_params.salt`: Random per-setup, stored openly (like a password hash salt). Not secret — the security comes from the passphrase, not the salt
+- `encrypted_private_key`: The full AES-256-GCM output - nonce prepended, auth tag appended
+- `integrity_tag`: The last 16 bytes of the ciphertext - same as the AES-GCM tag. Redundant but makes integrity checking explicit without re-parsing
+- `kdf_params.salt`: Random per-setup, stored openly (like a password hash salt). Not secret - the security comes from the passphrase, not the salt
 
 ---
 
@@ -170,11 +170,11 @@ The `recovery_material` table stores:
 
 | Attack | Defence |
 |--------|---------|
-| Server database leaked — attacker reads encrypted_private_key | Cannot decrypt without recovery passphrase. Argon2id with m=65536 means ~64MiB RAM per guess. |
+| Server database leaked - attacker reads encrypted_private_key | Cannot decrypt without recovery passphrase. Argon2id with m=65536 means ~64MiB RAM per guess. |
 | Attacker tries every common passphrase | Argon2id makes each guess expensive. 10,000 guesses/sec on a GPU requires 640 GB RAM simultaneously. |
 | Attacker has both ciphertext AND can guess fast | Salt is per-user, random 16 bytes. Pre-computation (rainbow tables) is infeasible. |
-| Wrong passphrase on decryption attempt | AES-GCM auth tag check rejects any wrong key immediately — no information leakage. |
-| Attacker modifies the encrypted blob on server | AES-GCM authentication tag catches any modification — decryption throws. |
+| Wrong passphrase on decryption attempt | AES-GCM auth tag check rejects any wrong key immediately - no information leakage. |
+| Attacker modifies the encrypted blob on server | AES-GCM authentication tag catches any modification - decryption throws. |
 
 ---
 
@@ -184,4 +184,4 @@ The `recovery_material` table stores:
 - The recovery passphrase should be different from the master password
 - The recovery passphrase should be stored in a physically secure location (printed paper, physical vault)
 - Recovery should be re-configured after changing the master password (new KEK pair generation)
-- The server marks `password_change_required = true` after recovery — the user must set a new password before normal vault use resumes
+- The server marks `password_change_required = true` after recovery - the user must set a new password before normal vault use resumes

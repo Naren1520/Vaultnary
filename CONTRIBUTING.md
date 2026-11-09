@@ -22,7 +22,7 @@ If you would like to contribute, please reach out first:
 ## Bug Reports
 
 Bug reports are welcome via GitHub Issues. Please use the provided issue templates.
-Security vulnerabilities must be reported privately — see [SECURITY.md](SECURITY.md).
+Security vulnerabilities must be reported privately - see [SECURITY.md](SECURITY.md).
 
 ## Code Standards
 
@@ -32,14 +32,14 @@ If you are an invited contributor, please follow these standards:
 - Run `cargo fmt` before committing
 - Run `cargo clippy -- -D warnings` and fix all warnings
 - Run `cargo test` and ensure all tests pass
-- No long unicode dash separators in comments — use plain `//` or `/* */`
+- No long unicode dash separators in comments - use plain `//` or `/* */`
 - All new endpoints must insert an audit event on success
 
 ### TypeScript (frontend)
 - Run `npm run typecheck` with zero errors
 - Run `npm run build` and confirm clean build
 - No `React` import unless used as a value (React 19 JSX transform)
-- Keep all key state in Zustand stores — never localStorage or sessionStorage
+- Keep all key state in Zustand stores - never localStorage or sessionStorage
 - No inline `style` tags with long dash separators in comments
 
 ## Commit Messages

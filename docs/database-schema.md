@@ -47,9 +47,9 @@ CREATE INDEX idx_users_email ON users (email);
 ```
 
 Key points:
-- `password_hash` is an Argon2id PHC string — never plaintext
+- `password_hash` is an Argon2id PHC string - never plaintext
 - Token hashes are SHA-256 hex strings; the plaintext token is sent to the user once and never stored
-- `password_change_required` is set to true when recovery is used — forces password reset on next login
+- `password_change_required` is set to true when recovery is used - forces password reset on next login
 
 ### auth_sessions
 
@@ -77,7 +77,7 @@ Key points:
 - `token_hash` is the SHA-256 hash of the raw session token (stored in the HttpOnly cookie)
 - `csrf_token_hash` is the SHA-256 hash of the CSRF token (sent to frontend in login response)
 - `device_fingerprint` is optional; supplied by the frontend; max 512 chars; never logged
-- `expires_at` is checked on every authenticated request — expired sessions are treated as revoked
+- `expires_at` is checked on every authenticated request - expired sessions are treated as revoked
 - `last_used_at` is updated on every authenticated request by the auth middleware
 
 ### vaults
@@ -95,7 +95,7 @@ CREATE UNIQUE INDEX idx_vaults_owner_id ON vaults (owner_id);
 ```
 
 Key points:
-- UNIQUE constraint on `owner_id` — exactly one vault per user
+- UNIQUE constraint on `owner_id` - exactly one vault per user
 - Created in the same transaction as user registration
 
 ### vault_items
@@ -129,10 +129,10 @@ CREATE INDEX idx_vault_items_name_trgm      ON vault_items USING GIN (name gin_t
 ```
 
 Key points:
-- `encrypted_payload` (BYTEA): AES-256-GCM ciphertext — format is `nonce(12) || ciphertext || tag(16)`
+- `encrypted_payload` (BYTEA): AES-256-GCM ciphertext - format is `nonce(12) || ciphertext || tag(16)`
 - `payload_metadata` (JSONB): non-secret fields for the credential type (e.g. `{"url":"...","username":"..."}`)
 - `parent_item_id` self-reference: forms the credential tree; cycle prevention is done in application code via recursive CTE before insert/update
-- `tags` TEXT[]: searched via GIN index — fast array containment
+- `tags` TEXT[]: searched via GIN index - fast array containment
 - `name` GIN trigram index: supports fast ILIKE substring search
 - The API never returns `encrypted_payload` in list or metadata responses
 
@@ -214,7 +214,7 @@ CREATE INDEX idx_credential_permissions_user_id ON credential_permissions (user_
 ```
 
 Key points:
-- One row per (item, user) — UNIQUE enforced
+- One row per (item, user) - UNIQUE enforced
 - `is_favorite` is per-user per-item so it lives here rather than on vault_items
 - Permission check queries use this table on every vault item request
 
@@ -240,7 +240,7 @@ CREATE INDEX idx_share_invitations_invitee_email ON share_invitations (invitee_e
 ```
 
 Key points:
-- `invitee_email` not `invitee_id` — the recipient may not have an account yet
+- `invitee_email` not `invitee_id` - the recipient may not have an account yet
 - Expiry is enforced lazily at read time (`expires_at < now()`)
 - `state` CHECK constraint enforces the valid lifecycle
 
@@ -263,7 +263,7 @@ CREATE INDEX idx_key_envelopes_item_id ON credential_key_envelopes (item_id);
 ```
 
 Key points:
-- One row per (item, user) — each user who has access gets their own encrypted copy of the DEK
+- One row per (item, user) - each user who has access gets their own encrypted copy of the DEK
 - `encrypted_dek` is the RSA-OAEP-wrapped raw 32-byte AES key
 - When a permission is removed, this row is deleted so the former user cannot decrypt even if they have the ciphertext
 
@@ -283,7 +283,7 @@ CREATE INDEX idx_user_public_keys_user_id ON user_public_keys (user_id);
 ```
 
 Key points:
-- Public keys are not secret — readable by any authenticated user via `/api/v1/auth/public-keys/:id`
+- Public keys are not secret - readable by any authenticated user via `/api/v1/auth/public-keys/:id`
 - Used by the frontend to encrypt DEKs when creating a vault item or sharing one
 
 ### recovery_material
@@ -302,7 +302,7 @@ CREATE TABLE recovery_material (
 ```
 
 Key points:
-- UNIQUE on `user_id` — one recovery record per user (upserted on re-setup)
+- UNIQUE on `user_id` - one recovery record per user (upserted on re-setup)
 - `encrypted_private_key` is the AES-256-GCM ciphertext of the PKCS#8 private key
 - `kdf_params` contains `{ algorithm, memory_cost, time_cost, parallelism, salt }` needed to re-derive the decryption key from the recovery passphrase
 - Neither the private key nor the decryption key is ever stored in plaintext
@@ -337,7 +337,7 @@ CREATE INDEX idx_audit_events_resource_id   ON audit_events (resource_id);
 ```
 
 Key points:
-- The application database role is granted INSERT and SELECT only — no UPDATE or DELETE
+- The application database role is granted INSERT and SELECT only - no UPDATE or DELETE
 - `metadata` JSONB contains contextual information (IP, user_agent) but never plaintext secrets
 - `actor_id` uses SET NULL on user delete to preserve the audit trail after account deletion
 - `(actor_id, created_at DESC)` index supports fast per-user timeline queries

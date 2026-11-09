@@ -2,7 +2,7 @@
 
 ## Overview
 
-Permissions in Vaultnary are **explicit and per-item**. There is no implicit inheritance — a user must have a row in `credential_permissions` for each specific vault item they can access. A user having permission on a parent item does NOT automatically grant access to child items.
+Permissions in Vaultnary are **explicit and per-item**. There is no implicit inheritance - a user must have a row in `credential_permissions` for each specific vault item they can access. A user having permission on a parent item does NOT automatically grant access to child items.
 
 The system uses four roles arranged in a hierarchy. Each role includes all the capabilities of the roles below it.
 
@@ -57,13 +57,13 @@ Owner (4)
 | POST /vault/items/:id/favorite | ✓ | ✓ | ✓ | ✓ |
 | DELETE /vault/items/:id/favorite | ✓ | ✓ | ✓ | ✓ |
 | GET /vault/items/:id/usage | ✓ | ✓ | ✓ | ✓ |
-| PUT /vault/items/:id | — | ✓ | ✓ | ✓ |
-| POST /vault/items/:id/usage | — | ✓ | ✓ | ✓ |
-| DELETE /vault/items/:id/usage/:uid | — | ✓ | ✓ | ✓ |
-| POST /vault/items/:id/invitations | — | — | ✓ | ✓ |
-| GET /vault/items/:id/invitations | — | — | ✓ | ✓ |
-| DELETE /vault/items/:id/permissions/:uid | — | — | ✓ | ✓ |
-| DELETE /vault/items/:id (confirm: true) | — | — | — | ✓ |
+| PUT /vault/items/:id | - | ✓ | ✓ | ✓ |
+| POST /vault/items/:id/usage | - | ✓ | ✓ | ✓ |
+| DELETE /vault/items/:id/usage/:uid | - | ✓ | ✓ | ✓ |
+| POST /vault/items/:id/invitations | - | - | ✓ | ✓ |
+| GET /vault/items/:id/invitations | - | - | ✓ | ✓ |
+| DELETE /vault/items/:id/permissions/:uid | - | - | ✓ | ✓ |
+| DELETE /vault/items/:id (confirm: true) | - | - | - | ✓ |
 
 ---
 
@@ -104,7 +104,7 @@ CREATE TABLE credential_permissions (
 UNIQUE INDEX ON credential_permissions (item_id, user_id);
 ```
 
-One row per (item, user) pair — a user can only hold one role on an item at a time. The `is_favorite` flag is stored here since it is per-user per-item.
+One row per (item, user) pair - a user can only hold one role on an item at a time. The `is_favorite` flag is stored here since it is per-user per-item.
 
 ---
 
@@ -115,7 +115,7 @@ If a user has **no** direct `credential_permissions` row for a requested item bu
 1. Does NOT grant access (returns 404 to the request for the item itself)
 2. When returning item metadata, includes `inherited_from: { id, name }` showing the nearest ancestor with a permission
 
-This is **informational only** — it tells the user "you might be able to ask for access to this item since you have access to its parent." The user still receives 404 until a direct permission is granted.
+This is **informational only** - it tells the user "you might be able to ask for access to this item since you have access to its parent." The user still receives 404 until a direct permission is granted.
 
 Attempting to create an invitation for an item where the requestor has only inherited access (no direct row) returns **403**.
 
@@ -137,7 +137,7 @@ pending ──accept──> accepted
 | pending | No access granted yet. Can be accepted, declined, or revoked. |
 | accepted | `credential_permissions` row exists for invitee. |
 | declined | Invitee declined. No permission granted. Invitation is closed. |
-| revoked | Inviter or Owner revoked. If already accepted, permission row is NOT automatically removed — revocation only stops re-acceptance. To remove actual access, also call DELETE /vault/items/:id/permissions/:uid |
+| revoked | Inviter or Owner revoked. If already accepted, permission row is NOT automatically removed - revocation only stops re-acceptance. To remove actual access, also call DELETE /vault/items/:id/permissions/:uid |
 | expired | `expires_at < now()`. Treated as invalid at API level. Cannot be accepted. |
 
 ---
@@ -181,4 +181,4 @@ Every permission-relevant action writes an `audit_events` row:
 | Invitation revoked | invitation.revoked |
 | Collaborator removed | permission.changed |
 
-Audit events are append-only — the database role used by the application is granted INSERT and SELECT only on `audit_events`. No UPDATE or DELETE is possible at the application level.
+Audit events are append-only - the database role used by the application is granted INSERT and SELECT only on `audit_events`. No UPDATE or DELETE is possible at the application level.

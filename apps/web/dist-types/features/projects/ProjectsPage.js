@@ -9,7 +9,7 @@ import { useToast } from '../../components/ui/Toast';
 import { apiGet, apiPost } from '../../services/http-client';
 const columns = [
     { key: 'name', header: 'Name', sortable: true, render: (r) => _jsx("span", { style: { fontWeight: 'var(--font-weight-medium)' }, children: r.name }) },
-    { key: 'description', header: 'Description', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.description ?? '—' }) },
+    { key: 'description', header: 'Description', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.description ?? '-' }) },
     { key: 'created_at', header: 'Created', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }, children: new Date(r.created_at).toLocaleDateString() }), width: '9rem' },
 ];
 export default function ProjectsPage() {

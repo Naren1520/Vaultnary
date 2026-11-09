@@ -27,7 +27,7 @@ const columns: Column<UsageRecord>[] = [
     header: 'Linked to',
     render: (r) => (
       <span style={{ fontSize: 'var(--text-sm)' }}>
-        {r.project_id ? `Project: ${r.project_id}` : r.service_id ? `Service: ${r.service_id}` : '—'}
+        {r.project_id ? `Project: ${r.project_id}` : r.service_id ? `Service: ${r.service_id}` : '-'}
       </span>
     ),
   },
@@ -36,7 +36,7 @@ const columns: Column<UsageRecord>[] = [
     header: 'Notes',
     render: (r) => (
       <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-        {r.notes ?? '—'}
+        {r.notes ?? '-'}
       </span>
     ),
   },

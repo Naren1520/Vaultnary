@@ -19,7 +19,7 @@ User types master password
          |
          | Used to encrypt the KEK private key for recovery storage
          |
-         | Also used as the vault "unlock" signal — held in Zustand vault-store
+         | Also used as the vault "unlock" signal - held in Zustand vault-store
          v
    KEK Key Pair (RSA-OAEP, 4096-bit modulus, SHA-256 hash)
    generated once via crypto.subtle.generateKey
@@ -34,7 +34,7 @@ User types master password
          For each vault item:
          |
          v
-   DEK — Data Encryption Key (random 256-bit AES-256-GCM CryptoKey)
+   DEK - Data Encryption Key (random 256-bit AES-256-GCM CryptoKey)
    generated fresh for every vault item via crypto.subtle.generateKey (extractable: true)
          |
          +-- Encrypts the item's secret payload  -->  stored in vault_items.encrypted_payload
@@ -49,43 +49,43 @@ User types master password
 
 ## Algorithms Used
 
-### Key Derivation — Argon2id
+### Key Derivation - Argon2id
 - **Library:** argon2-browser v1.18 (WASM, runs in browser only)
 - **Algorithm:** Argon2id (hybrid of Argon2i and Argon2d)
 - **Parameters:** m=65536 (64 MiB memory), t=3 (iterations), p=4 (parallelism lanes), outputLen=32
-- **Salt:** 16 bytes from `crypto.getRandomValues` — unique per user, stored alongside recovery material
+- **Salt:** 16 bytes from `crypto.getRandomValues` - unique per user, stored alongside recovery material
 - **Output:** 32 bytes imported as AES-256-GCM CryptoKey with `extractable: false`
 - **Why Argon2id:** Resistant to both GPU brute-force (memory-hard) and side-channel cache attacks. Parameters match OWASP recommendations.
 
-### Symmetric Encryption — AES-256-GCM
+### Symmetric Encryption - AES-256-GCM
 - **API:** Web Crypto API (`crypto.subtle.encrypt` / `crypto.subtle.decrypt`)
 - **Key size:** 256 bits
 - **Nonce:** 12 bytes from `crypto.getRandomValues`, generated fresh for every encrypt call
-- **Output format:** `nonce(12 bytes) || ciphertext || auth_tag(16 bytes)` — nonce is prepended so it always travels with the ciphertext
-- **Authentication:** The 16-byte GCM authentication tag is included in the ciphertext blob. Any single-byte modification to the ciphertext will cause decryption to throw — this is the integrity check.
+- **Output format:** `nonce(12 bytes) || ciphertext || auth_tag(16 bytes)` - nonce is prepended so it always travels with the ciphertext
+- **Authentication:** The 16-byte GCM authentication tag is included in the ciphertext blob. Any single-byte modification to the ciphertext will cause decryption to throw - this is the integrity check.
 - **Where used:** Encrypting vault item secret payloads; encrypting the KEK private key for recovery
 
-### Asymmetric Key Encryption — RSA-OAEP
+### Asymmetric Key Encryption - RSA-OAEP
 - **API:** Web Crypto API
 - **Key size:** 4096-bit modulus
 - **Hash:** SHA-256
 - **Generated via:** `crypto.subtle.generateKey({ name: 'RSA-OAEP', modulusLength: 4096, publicExponent: [1,0,1], hash: 'SHA-256' }, false, ['encrypt', 'decrypt'])`
-- **Private key:** `extractable: false` — cannot be exported from the browser's crypto context except via `pkcs8` export for recovery purposes
+- **Private key:** `extractable: false` - cannot be exported from the browser's crypto context except via `pkcs8` export for recovery purposes
 - **Where used:** Wrapping (encrypting) DEKs for each user who has access to a vault item
 
-### Token Generation — CSPRNG
+### Token Generation - CSPRNG
 - **Library:** `rand::rngs::OsRng` in the Rust backend
 - **Token bits:** 128 bits minimum (32 hex characters)
 - **Encoding:** lowercase hex string
 - **Usage:** Session tokens, CSRF tokens, email verification tokens, password reset tokens
 - **Storage:** SHA-256 hash of the token is stored in the database. The plaintext token is sent to the client once and never stored server-side.
 
-### Password Hashing — Argon2id (Backend)
+### Password Hashing - Argon2id (Backend)
 - **Library:** `argon2` crate v0.5
 - **Algorithm:** Argon2id
 - **Parameters:** m=65536, t=3, p=4, 16-byte random salt via `OsRng`
 - **Output format:** PHC string (`$argon2id$v=19$m=65536,t=3,p=4$...`)
-- **Verification:** `argon2::PasswordVerifier::verify_password` — inherently constant-time due to Argon2 output comparison
+- **Verification:** `argon2::PasswordVerifier::verify_password` - inherently constant-time due to Argon2 output comparison
 
 ---
 

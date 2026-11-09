@@ -161,7 +161,7 @@ export default function LandingPage() {
                 <p className="lp-kicker"><span /> A better home for team credentials</p>
                 <h1>Keep your team’s keys <span>in good hands.</span></h1>
                 <p className="lp-hero__description">
-                  Vaultnary brings credentials, people, and projects together—so your team
+                  Vaultnary brings credentials, people, and projects together-so your team
                   can share access with clarity and confidence.
                 </p>
                 <div className="lp-hero__actions">

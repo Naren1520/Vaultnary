@@ -24,7 +24,7 @@ interface Workspace {
 
 const columns: Column<Project>[] = [
   { key: 'name', header: 'Name', sortable: true, render: (r) => <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{r.name}</span> },
-  { key: 'description', header: 'Description', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.description ?? '—'}</span> },
+  { key: 'description', header: 'Description', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.description ?? '-'}</span> },
   { key: 'created_at', header: 'Created', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>{new Date(r.created_at).toLocaleDateString()}</span>, width: '9rem' },
 ]
 
