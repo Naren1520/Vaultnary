@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import logoUrl from '../../assets/logo.png'
+import LaptopCard from './components/LaptopCard'
 import './landing.css'
 
 const features = [
@@ -138,7 +139,7 @@ export default function LandingPage() {
         <div className="lp-container lp-nav__inner">
           <Link to="/" className="lp-brand" aria-label="Vaultnary home">
             <img src={logoUrl} alt="Vaultnary" />
-            <span aria-hidden="true">vaultnary</span>
+            <span aria-hidden="true">Vaultnary</span>
           </Link>
           <nav className="lp-nav__links" aria-label="Main navigation">
             <a href="#product">Product</a>
@@ -192,6 +193,13 @@ export default function LandingPage() {
             <div><LockKeyhole size={16} /> Private vault</div>
             <div><Users size={16} /> Team workspaces</div>
             <div><Clock3 size={16} /> Activity history</div>
+          </div>
+        </section>
+
+        <section className="lp-device-showcase" aria-label="Vaultnary workspace on a laptop">
+          <div className="lp-container">
+            <p className="lp-device-showcase__eyebrow">A better view of your workspace</p>
+            <LaptopCard />
           </div>
         </section>
 

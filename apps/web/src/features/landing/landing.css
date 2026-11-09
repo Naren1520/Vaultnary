@@ -305,6 +305,22 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   text-decoration: none;
 }
 
+.lp-device-showcase {
+  padding-block: clamp(3rem, 6vw, 5rem) 2rem;
+  border-bottom: 1px solid var(--lp-line);
+  background: #f8f8f7;
+}
+
+.lp-device-showcase__eyebrow {
+  margin: 0;
+  color: #6b6b68;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .lp-preview-wrap {
   position: relative;
   min-width: 0;
