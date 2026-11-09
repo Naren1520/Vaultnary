@@ -209,14 +209,96 @@ export default function LandingPage() {
                 <div className="lp-feature-grid">
                   {features.map(({ icon: Icon, title, body, detail }, index) => (
                     <article className="lp-feature-card lp-reveal lp-reveal--zoom" key={title}>
-                      <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
-                      <span className="lp-feature-card__number">0{index + 1}</span>
-                      <h3>{title}</h3>
-                      <p>{body}</p>
+                      <div className="lp-feature-card__top">
+                        <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
+                        <span className="lp-feature-card__number">0{index + 1}</span>
+                      </div>
+                      <div className="lp-feature-card__copy">
+                        <h3>{title}</h3>
+                        <p>{body}</p>
+                      </div>
+                      <div className={`lp-feature-card__visual lp-feature-card__visual--${index + 1}`} aria-hidden="true">
+                        {index === 0 && (
+                          <div className="lp-visual-vault">
+                            <div className="lp-visual-vault__row">
+                              <span className="lp-visual-vault__mark"><KeyRound size={13} /></span>
+                              <span className="lp-visual-vault__name"><b>Production API</b><small>Credential</small></span>
+                              <span className="lp-visual-vault__state"><LockKeyhole size={11} /> SEALED</span>
+                            </div>
+                            <div className="lp-visual-vault__row">
+                              <span className="lp-visual-vault__mark"><KeyRound size={13} /></span>
+                              <span className="lp-visual-vault__name"><b>Database token</b><small>Credential</small></span>
+                              <span className="lp-visual-vault__state"><LockKeyhole size={11} /> SEALED</span>
+                            </div>
+                          </div>
+                        )}
+                        {index === 1 && (
+                          <div className="lp-visual-team">
+                            <div className="lp-visual-team__member">
+                              <span className="lp-visual-team__avatar">NS</span>
+                              <span><b>Naren S J</b><small>Workspace owner</small></span>
+                              <i className="lp-visual-team__role">OWNER</i>
+                            </div>
+                            <div className="lp-visual-team__member">
+                              <span className="lp-visual-team__avatar lp-visual-team__avatar--alt">AM</span>
+                              <span><b>Alex Morgan</b><small>Project member</small></span>
+                              <i className="lp-visual-team__role">MEMBER</i>
+                            </div>
+                          </div>
+                        )}
+                        {index === 2 && (
+                          <div className="lp-visual-tree">
+                            <div className="lp-visual-tree__row lp-visual-tree__row--root">
+                              <span><Users size={12} /></span><b>Engineering</b><small>Workspace</small>
+                            </div>
+                            <div className="lp-visual-tree__branch">
+                              <div className="lp-visual-tree__row">
+                                <span><FolderKanban size={12} /></span><b>Platform</b><small>Project</small>
+                              </div>
+                              <div className="lp-visual-tree__row">
+                                <span><KeyRound size={12} /></span><b>Production API</b><small>Credential</small>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {index === 3 && (
+                          <div className="lp-visual-activity">
+                            <div className="lp-visual-activity__row">
+                              <span className="lp-visual-activity__dot" />
+                              <span><b>Credential accessed</b><small>Production API</small></span>
+                              <time>2m ago</time>
+                            </div>
+                            <div className="lp-visual-activity__row">
+                              <span className="lp-visual-activity__dot lp-visual-activity__dot--muted" />
+                              <span><b>Member invited</b><small>Engineering workspace</small></span>
+                              <time>1h ago</time>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <span className="lp-feature-card__detail"><Check size={14} /> {detail}</span>
                     </article>
                   ))}
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="lp-opening-video" aria-label="Vaultnary product video">
+            <div className="lp-container">
+              <div className="lp-opening-video__frame">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster={`${import.meta.env.BASE_URL}images/img1.jpg`}
+                  aria-label="Vaultnary product demonstration"
+                >
+                  <source src={`${import.meta.env.BASE_URL}videos/video.mp4`} type="video/mp4" />
+                  Your browser does not support embedded videos.
+                </video>
               </div>
             </div>
           </section>
