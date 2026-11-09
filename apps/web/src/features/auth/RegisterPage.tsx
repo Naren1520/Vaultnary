@@ -99,6 +99,10 @@ export default function RegisterPage() {
         <button type="submit" disabled={loading} style={submitStyle}>
           {loading ? 'Creating account…' : 'Create account'}
         </button>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
+          By creating an account, you acknowledge the <Link to="/terms" style={{ color: 'var(--color-accent)' }}>Terms</Link>
+          {' '}and <Link to="/privacy" style={{ color: 'var(--color-accent)' }}>Privacy Notice</Link>.
+        </p>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
           Already have an account? <Link to="/login" style={{ color: 'var(--color-accent)' }}>Sign in</Link>
         </p>

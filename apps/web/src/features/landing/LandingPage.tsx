@@ -325,6 +325,13 @@ export default function LandingPage() {
               <Link to="/login">Log in</Link>
               <Link to="/register">Create an account</Link>
             </nav>
+            <nav className="lp-footer__column" aria-label="Legal and security information">
+              <h2>Information</h2>
+              <Link to="/security">Security</Link>
+              <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
+              <a href="mailto:narensonu1520@gmail.com">Contact</a>
+            </nav>
           </div>
           <div className="lp-footer__bottom">
             <span>© {new Date().getFullYear()} Vaultnary</span>
