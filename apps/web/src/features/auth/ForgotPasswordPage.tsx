@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiPost } from '../../services/http-client'
 import { isValidEmail } from '../../services/validation'
 import type { ForgotPasswordRequest } from './types'
+import './auth.css'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -26,7 +27,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div style={pageStyle}>
+    <div className="auth-page" style={pageStyle}>
       <div style={cardStyle}>
         <h1 style={headingStyle}>Reset password</h1>
         {submitted ? (

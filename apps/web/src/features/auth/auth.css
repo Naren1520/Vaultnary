@@ -1,0 +1,5 @@
+.auth-page {
+  --color-accent: #1a1a18;
+  --border-focus: 2px solid #1a1a18;
+  --outline-focus: 2px solid #1a1a18;
+}

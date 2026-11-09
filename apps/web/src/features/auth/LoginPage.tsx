@@ -5,6 +5,7 @@ import { apiPost } from '../../services/http-client'
 import { isValidEmail, isValidPassword } from '../../services/validation'
 import { ValidationError, RateLimitError, getErrorMessage } from '../../services/error-handler'
 import type { LoginRequest, LoginResponse } from './types'
+import './auth.css'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -63,7 +64,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={pageStyle}>
+    <div className="auth-page" style={pageStyle}>
       <form
         onSubmit={handleSubmit}
         noValidate

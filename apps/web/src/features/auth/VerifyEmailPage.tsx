@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { apiGet } from '../../services/http-client'
+import './auth.css'
 
 type State = 'loading' | 'success' | 'error'
 
@@ -18,7 +19,7 @@ export default function VerifyEmailPage() {
   }, [searchParams])
 
   return (
-    <div style={pageStyle}>
+    <div className="auth-page" style={pageStyle}>
       <div style={cardStyle}>
         {state === 'loading' && (
           <p style={mutedStyle} role="status">Verifying your email…</p>

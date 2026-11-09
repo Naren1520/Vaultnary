@@ -4,6 +4,7 @@ import { apiPost } from '../../services/http-client'
 import { isValidEmail, isValidPassword } from '../../services/validation'
 import { ValidationError, RateLimitError, getErrorMessage } from '../../services/error-handler'
 import type { RegisterRequest } from './types'
+import './auth.css'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -49,7 +50,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div style={pageStyle}>
+      <div className="auth-page" style={pageStyle}>
         <div style={cardStyle}>
           <h1 style={headingStyle}>Check your email</h1>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
@@ -64,7 +65,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div style={pageStyle}>
+    <div className="auth-page" style={pageStyle}>
       <form onSubmit={handleSubmit} noValidate aria-label="Create account" style={cardStyle}>
         <h1 style={headingStyle}>Create account</h1>
         {globalError && <p role="alert" style={errorStyle}>{globalError}</p>}

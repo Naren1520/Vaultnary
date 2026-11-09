@@ -1,311 +1,391 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Lock, Shield, Users, Eye, Share2, KeyRound, ArrowRight } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Clock3,
+  Eye,
+  Fingerprint,
+  FolderKanban,
+  KeyRound,
+  LockKeyhole,
+  Search,
+  ShieldCheck,
+  Users,
+} from 'lucide-react'
+import logoUrl from '../../assets/logo.png'
 import './landing.css'
 
+const features = [
+  {
+    icon: LockKeyhole,
+    title: 'Private by design',
+    body: 'Keep sensitive values encrypted in your vault, with control over when they are unlocked.',
+    detail: 'A calmer place for sensitive work',
+  },
+  {
+    icon: Users,
+    title: 'Share with intention',
+    body: 'Invite teammates to the workspace and manage who can access shared credentials.',
+    detail: 'Access that follows your team',
+  },
+  {
+    icon: FolderKanban,
+    title: 'Everything in context',
+    body: 'Organize credentials around workspaces, projects, and the services they support.',
+    detail: 'Less hunting, more doing',
+  },
+  {
+    icon: Eye,
+    title: 'Know what happened',
+    body: 'Review security activity and audit events when your team needs a clear history.',
+    detail: 'Visibility when it matters',
+  },
+]
+
+const steps = [
+  {
+    number: '01',
+    title: 'Create a workspace',
+    body: 'Bring the right people and projects together in one shared space.',
+  },
+  {
+    number: '02',
+    title: 'Add your credentials',
+    body: 'Keep the keys and account details your team relies on organized.',
+  },
+  {
+    number: '03',
+    title: 'Share only what is needed',
+    body: 'Manage membership and credential access as your team changes.',
+  },
+]
+
+const workspaceLevels = [
+  {
+    icon: Users,
+    number: '01',
+    title: 'Workspace',
+    body: 'Bring the people and shared information for a team into one clear home.',
+  },
+  {
+    icon: FolderKanban,
+    number: '02',
+    title: 'Project',
+    body: 'Group related work together so credentials stay connected to their purpose.',
+  },
+  {
+    icon: KeyRound,
+    number: '03',
+    title: 'Credential',
+    body: 'Keep the account details your team uses organized and easier to find.',
+  },
+]
+
 export default function LandingPage() {
+  const [navSolid, setNavSolid] = useState(false)
+
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal')
-    const obs = new IntersectionObserver(
+    document.documentElement.classList.add('lp-hide-scrollbar')
+    document.body.classList.add('lp-hide-scrollbar')
+
+    const revealElements = document.querySelectorAll<HTMLElement>('.lp-reveal')
+    const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) { e.target.classList.add('is-visible'); obs.unobserve(e.target) }
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('lp-reveal--visible')
+            observer.unobserve(entry.target)
+          }
         })
       },
       { threshold: 0.12 },
     )
-    els.forEach((el) => obs.observe(el))
-    return () => obs.disconnect()
+    revealElements.forEach((element) => observer.observe(element))
+
+    const updateNavigation = () => setNavSolid(window.scrollY > 16)
+    updateNavigation()
+    window.addEventListener('scroll', updateNavigation, { passive: true })
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', updateNavigation)
+      document.documentElement.classList.remove('lp-hide-scrollbar')
+      document.body.classList.remove('lp-hide-scrollbar')
+    }
   }, [])
 
   return (
     <div className="lp">
-      <LPNav />
-      <LPHero />
-      <LPLogos />
-      <LPFeatures />
-      <LPSteps />
-      <LPQuote />
-      <LPCta />
-      <LPFooter />
-    </div>
-  )
-}
-
-function LPNav() {
-  const [solid, setSolid] = useState(false)
-  const [imgFailed, setImgFailed] = useState(false)
-  const logoUrl = new URL('../../assets/logo.png', import.meta.url).href
-
-  useEffect(() => {
-    const fn = () => setSolid(window.scrollY > 32)
-    window.addEventListener('scroll', fn, { passive: true })
-    return () => window.removeEventListener('scroll', fn)
-  }, [])
-
-  return (
-    <header className={`lp-nav ${solid ? 'lp-nav--solid' : ''}`}>
-      <div className="lp-nav__row">
-        <Link to="/" className="lp-nav__brand">
-          {imgFailed ? (
-            <>
-              <Lock size={18} strokeWidth={2} aria-hidden="true" />
-              Vaultnary
-            </>
-          ) : (
-            <img
-              src={logoUrl}
-              alt="Vaultnary"
-              onError={() => setImgFailed(true)}
-              style={{ height: '2rem', width: 'auto', objectFit: 'contain' }}
-            />
-          )}
-        </Link>
-        <nav aria-label="Site navigation" className="lp-nav__links">
-          <a href="#features" className="lp-nav__link">Features</a>
-          <a href="#steps" className="lp-nav__link">How it works</a>
-          <Link to="/login" className="lp-nav__link">Sign in</Link>
-          <Link to="/register" className="lp-btn-outline">Get started</Link>
-        </nav>
-      </div>
-    </header>
-  )
-}
-
-function LPHero() {
-  const bgRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const fn = () => {
-      if (bgRef.current) bgRef.current.style.transform = `translateY(${window.scrollY * 0.28}px)`
-    }
-    window.addEventListener('scroll', fn, { passive: true })
-    return () => window.removeEventListener('scroll', fn)
-  }, [])
-
-  return (
-    <section className="lp-hero" aria-label="Introduction">
-      <div className="lp-hero__bg" ref={bgRef} />
-      <div className="lp-hero__scrim" aria-hidden="true" />
-      <div className="lp-wrap lp-hero__body">
-        <p className="lp-hero__eyebrow reveal">Credential management, done right</p>
-        <h1 className="lp-hero__h1 reveal">
-          Every password.<br />Every key.<br />Always secure.
-        </h1>
-        <p className="lp-hero__sub reveal">
-          The one place your team stores, organises, and safely shares credentials -without ever putting anyone at risk.
-        </p>
-        <div className="lp-hero__actions reveal">
-          <Link to="/register" className="lp-btn-primary">
-            Start for free <ArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
+      <header className={`lp-nav ${navSolid ? 'lp-nav--solid' : ''}`}>
+        <div className="lp-container lp-nav__inner">
+          <Link to="/" className="lp-brand" aria-label="Vaultnary home">
+            <img src={logoUrl} alt="Vaultnary" />
           </Link>
-          <Link to="/login" className="lp-btn-ghost">Sign in to vault</Link>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-const logoNames = ['Acme Corp', 'Horizon Labs', 'Stackflow', 'Relay Inc', 'Northgate']
-
-function LPLogos() {
-  return (
-    <div className="lp-logos" aria-label="Trusted by teams like">
-      <div className="lp-wrap lp-logos__row">
-        <span className="lp-logos__label">Trusted by engineering teams at</span>
-        {logoNames.map((n) => (
-          <span key={n} className="lp-logos__name">{n}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const features = [
-  {
-    icon: Lock,
-    title: 'Yours and only yours',
-    body: 'Everything you save is locked before it leaves your device. Nobody else -including us -can read your secrets.',
-    img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=720&q=80&auto=format&fit=crop',
-    alt: 'A single key on a clean surface',
-  },
-  {
-    icon: Users,
-    title: 'Share access, not passwords',
-    body: 'Give a teammate access to exactly one credential. Control who sees what, and take it back in a single click.',
-    img: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=720&q=80&auto=format&fit=crop',
-    alt: 'Two colleagues reviewing work together',
-  },
-  {
-    icon: KeyRound,
-    title: 'Every type of credential',
-    body: 'Passwords, API tokens, SSH keys, two-factor codes, database logins -all in one organised, searchable vault.',
-    img: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=720&q=80&auto=format&fit=crop',
-    alt: 'Organised key rack',
-  },
-  {
-    icon: Eye,
-    title: 'A record of everything',
-    body: 'See exactly who accessed what and when. A permanent log your team can rely on for accountability and audit.',
-    img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=720&q=80&auto=format&fit=crop',
-    alt: 'Clean data dashboard',
-  },
-  {
-    icon: Share2,
-    title: 'Organised around your projects',
-    body: 'Tag credentials to the projects and environments they belong to. Find the right key the moment you need it.',
-    img: 'https://images.unsplash.com/photo-1507925921958-8a62f3d1a50d?w=720&q=80&auto=format&fit=crop',
-    alt: 'Neatly organised folders on a desk',
-  },
-  {
-    icon: Shield,
-    title: 'Never locked out again',
-    body: 'Set a recovery phrase once. If you ever lose access, your vault is still yours to get back -no support ticket needed.',
-    img: 'https://images.unsplash.com/photo-1433888104895-5b54e9988929?w=720&q=80&auto=format&fit=crop',
-    alt: 'Spare key on a hook',
-  },
-]
-
-function LPFeatures() {
-  return (
-    <section id="features" className="lp-features" aria-label="Features">
-      <div className="lp-wrap">
-        <div className="lp-section-hd reveal">
-          <p className="lp-eyebrow">What you get</p>
-          <h2 className="lp-h2">Built for teams who can't afford a breach</h2>
-          <p className="lp-lead">Stop emailing passwords. Stop using shared accounts. Start doing it properly.</p>
-        </div>
-        <div className="lp-features__list">
-          {features.map((f, i) => <FeatureRow key={f.title} f={f} flip={i % 2 !== 0} />)}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function FeatureRow({ f, flip }: { f: typeof features[0]; flip: boolean }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [vis, setVis] = useState(false)
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVis(true); obs.disconnect() } }, { threshold: 0.15 })
-    if (ref.current) obs.observe(ref.current)
-    return () => obs.disconnect()
-  }, [])
-
-  return (
-    <div ref={ref} className={`lp-frow ${flip ? 'lp-frow--flip' : ''} ${vis ? 'lp-frow--vis' : ''}`}>
-      <div className="lp-frow__img-wrap">
-        <img src={f.img} alt={f.alt} className="lp-frow__img" loading="lazy" />
-      </div>
-      <div className="lp-frow__copy">
-        <f.icon size={28} strokeWidth={1.5} className="lp-frow__icon" aria-hidden="true" />
-        <h3 className="lp-frow__title">{f.title}</h3>
-        <p className="lp-frow__body">{f.body}</p>
-      </div>
-    </div>
-  )
-}
-
-const steps = [
-  { n: '01', title: 'Create your vault', body: 'Sign up with your email address. Your private vault is ready in under a minute.' },
-  { n: '02', title: 'Add your credentials', body: 'Type in a password, paste an API key, or store an SSH key -any kind of secret.' },
-  { n: '03', title: 'Unlock only when you need to', body: 'Your vault stays closed until you open it. Like a physical safe, but in your browser.' },
-  { n: '04', title: 'Share just what you choose', body: 'Give one teammate access to one secret. Take it back any time. Nothing more leaks.' },
-]
-
-function LPSteps() {
-  return (
-    <section id="steps" className="lp-steps" aria-label="How it works">
-      <div className="lp-steps__bg" aria-hidden="true" />
-      <div className="lp-wrap lp-steps__inner">
-        <div className="lp-section-hd reveal">
-          <p className="lp-eyebrow">Simple by design</p>
-          <h2 className="lp-h2">Ready in four steps</h2>
-        </div>
-        <ol className="lp-steps__list" aria-label="Steps to get started">
-          {steps.map((s, i) => <StepCard key={s.n} s={s} delay={i * 100} />)}
-        </ol>
-      </div>
-    </section>
-  )
-}
-
-function StepCard({ s, delay }: { s: typeof steps[0]; delay: number }) {
-  const ref = useRef<HTMLLIElement>(null)
-  const [vis, setVis] = useState(false)
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVis(true); obs.disconnect() } }, { threshold: 0.2 })
-    if (ref.current) obs.observe(ref.current)
-    return () => obs.disconnect()
-  }, [])
-
-  return (
-    <li ref={ref} className={`lp-step ${vis ? 'lp-step--vis' : ''}`} style={{ transitionDelay: `${delay}ms` }}>
-      <span className="lp-step__n" aria-hidden="true">{s.n}</span>
-      <strong className="lp-step__title">{s.title}</strong>
-      <p className="lp-step__body">{s.body}</p>
-    </li>
-  )
-}
-
-function LPQuote() {
-  return (
-    <section className="lp-quote" aria-label="Customer quote">
-      <div className="lp-wrap lp-quote__inner reveal">
-        <blockquote className="lp-quote__text">
-          "We spent years sharing credentials over Slack and hoping nothing leaked. Vaultnary fixed that in an afternoon."
-        </blockquote>
-        <cite className="lp-quote__attr">Head of Engineering, a 40-person product team</cite>
-      </div>
-    </section>
-  )
-}
-
-function LPCta() {
-  return (
-    <section className="lp-cta" aria-label="Get started">
-      <div className="lp-cta__bg" aria-hidden="true" />
-      <div className="lp-cta__scrim" aria-hidden="true" />
-      <div className="lp-wrap lp-cta__inner reveal">
-        <h2 className="lp-cta__h2">Stop sharing passwords.<br />Start sharing access.</h2>
-        <p className="lp-cta__sub">Free to start. No credit card. Works immediately.</p>
-        <Link to="/register" className="lp-btn-primary lp-btn-primary--lg">
-          Create your free vault <ArrowRight size={16} strokeWidth={2.5} aria-hidden="true" />
-        </Link>
-      </div>
-    </section>
-  )
-}
-
-function LPFooter() {
-  const [imgFailed, setImgFailed] = useState(false)
-  const logoUrl = new URL('../../assets/logo.png', import.meta.url).href
-
-  return (
-    <footer className="lp-footer" role="contentinfo">
-      <div className="lp-wrap">
-        <div className="lp-footer__row">
-          <span className="lp-footer__brand">
-            {imgFailed ? (
-              <><Lock size={15} strokeWidth={2} aria-hidden="true" /> Vaultnary</>
-            ) : (
-              <img src={logoUrl} alt="Vaultnary" onError={() => setImgFailed(true)} style={{ height: '1.5rem', width: 'auto', objectFit: 'contain' }} />
-            )}
-          </span>
-          <p className="lp-footer__copy">Your credentials, always under your control.</p>
-          <nav aria-label="Footer links" className="lp-footer__links">
-            <Link to="/register">Get started</Link>
-            <Link to="/login">Sign in</Link>
+          <nav className="lp-nav__links" aria-label="Main navigation">
+            <a href="#product">Product</a>
+            <a href="#workspaces">Workspaces</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#security">Security</a>
           </nav>
+          <div className="lp-nav__actions">
+            <Link to="/login" className="lp-nav__login">Log in</Link>
+            <Link to="/register" className="lp-button lp-button--small">
+              Get started <ArrowRight size={15} />
+            </Link>
+          </div>
         </div>
-        <div className="lp-footer__bottom">
-          <p className="lp-footer__legal">
-            &copy; {new Date().getFullYear()} Naren S J. All rights reserved. Proprietary software — not open source.
-          </p>
-          <p className="lp-footer__legal">
-            narensonu1520@gmail.com
-          </p>
+      </header>
+
+      <main>
+        <section className="lp-hero">
+          <div className="lp-container lp-hero__inner">
+            <div className="lp-hero__copy">
+              <p className="lp-kicker"><span /> A better home for team credentials</p>
+              <h1>Keep your team’s keys <span>in good hands.</span></h1>
+              <p className="lp-hero__description">
+                Vaultnary brings credentials, people, and projects together—so your team
+                can share access with clarity and confidence.
+              </p>
+              <div className="lp-hero__actions">
+                <Link to="/register" className="lp-button">
+                  Create your workspace <ArrowRight size={17} />
+                </Link>
+                <a href="#product" className="lp-text-link">
+                  Explore the product <ChevronRight size={16} />
+                </a>
+              </div>
+              <div className="lp-hero__note">
+                <ShieldCheck size={17} />
+                <span>Organized access. Clear ownership. One secure workspace.</span>
+              </div>
+            </div>
+
+            <ProductPreview />
+          </div>
+          <a className="lp-scroll-cue" href="#product">
+            <ArrowDown size={14} /> Scroll to explore
+          </a>
+        </section>
+
+        <section className="lp-principles" aria-label="Product principles">
+          <div className="lp-container lp-principles__inner">
+            <span>Built around the way teams work</span>
+            <div><LockKeyhole size={16} /> Private vault</div>
+            <div><Users size={16} /> Team workspaces</div>
+            <div><Clock3 size={16} /> Activity history</div>
+          </div>
+        </section>
+
+        <section id="product" className="lp-section lp-product">
+          <div className="lp-container">
+            <div className="lp-section-heading lp-reveal">
+              <p className="lp-eyebrow">One connected workspace</p>
+              <h2>Less scattered access.<br /><span>More intentional teamwork.</span></h2>
+              <p>
+                Give every credential a place, every teammate a role, and every project
+                the context it needs.
+              </p>
+            </div>
+
+            <div className="lp-feature-grid">
+              {features.map(({ icon: Icon, title, body, detail }, index) => (
+                <article className="lp-feature-card lp-reveal" key={title}>
+                  <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
+                  <span className="lp-feature-card__number">0{index + 1}</span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  <span className="lp-feature-card__detail"><Check size={14} /> {detail}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="workspaces" className="lp-section lp-structure">
+          <div className="lp-container">
+            <div className="lp-section-heading lp-structure__heading lp-reveal">
+              <p className="lp-eyebrow">A place for every part of the work</p>
+              <h2>Everything has a home.<br /><span>Nothing feels out of context.</span></h2>
+              <p>
+                Move from the bigger picture to the details your team needs, with a
+                simple structure that keeps related work together.
+              </p>
+            </div>
+
+            <div className="lp-structure__grid">
+              {workspaceLevels.map(({ icon: Icon, number, title, body }) => (
+                <article className="lp-structure-card lp-reveal" key={title}>
+                  <div className="lp-structure-card__top">
+                    <span className="lp-structure-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
+                    <span>{number}</span>
+                  </div>
+                  <p className="lp-structure-card__label">YOUR VAULTNARY STRUCTURE</p>
+                  <h3>{title}</h3>
+                  <p className="lp-structure-card__body">{body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="lp-section lp-workflow">
+          <div className="lp-container lp-workflow__layout">
+            <div className="lp-workflow__intro lp-reveal">
+              <p className="lp-eyebrow">A clear path from day one</p>
+              <h2>Good security should fit into the work you already do.</h2>
+              <p>
+                Start with a workspace, build a useful structure, and invite the people
+                who need access. No shared spreadsheets or mystery accounts.
+              </p>
+              <Link to="/register" className="lp-text-link">
+                Set up your workspace <ArrowRight size={16} />
+              </Link>
+            </div>
+
+            <ol className="lp-steps">
+              {steps.map((step) => (
+                <li className="lp-step lp-reveal" key={step.number}>
+                  <span className="lp-step__number">{step.number}</span>
+                  <div>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                  </div>
+                  <ChevronRight size={18} className="lp-step__arrow" />
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section id="security" className="lp-security">
+          <div className="lp-container lp-security__inner">
+            <div className="lp-security__visual lp-reveal" aria-hidden="true">
+              <div className="lp-security__halo"><Fingerprint size={54} strokeWidth={1.2} /></div>
+              <span className="lp-security__orbit lp-security__orbit--one" />
+              <span className="lp-security__orbit lp-security__orbit--two" />
+              <span className="lp-security__badge"><ShieldCheck size={17} /> Control stays with you</span>
+            </div>
+            <div className="lp-security__copy lp-reveal">
+              <p className="lp-eyebrow">Security with clarity</p>
+              <h2>Your credentials are important. Their access should be deliberate.</h2>
+              <p>
+                Keep your team’s sensitive information organized, share it with the
+                right people, and review activity from one place.
+              </p>
+              <ul>
+                <li><Check size={16} /> Workspace roles and member management</li>
+                <li><Check size={16} /> Credential sharing with access controls</li>
+                <li><Check size={16} /> Audit and security activity views</li>
+              </ul>
+              <Link to="/register" className="lp-text-link">
+                Take a closer look <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="lp-final-cta">
+          <div className="lp-container lp-final-cta__inner lp-reveal">
+            <div>
+              <p className="lp-eyebrow">Make access easier to manage</p>
+              <h2>Give your team a better way to work with secrets.</h2>
+              <p>Start organizing credentials and team access in Vaultnary.</p>
+            </div>
+            <Link to="/register" className="lp-button lp-button--light">
+              Get started <ArrowRight size={17} />
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      <footer className="lp-footer">
+        <div className="lp-container">
+          <div className="lp-footer__top">
+            <div className="lp-footer__brand-block">
+              <Link to="/" className="lp-brand" aria-label="Vaultnary home">
+                <img src={logoUrl} alt="Vaultnary" />
+              </Link>
+              <p>
+                A thoughtful home for the credentials, projects, and people your team
+                relies on.
+              </p>
+            </div>
+            <nav className="lp-footer__column" aria-label="Explore Vaultnary">
+              <h2>Explore</h2>
+              <a href="#product">Product</a>
+              <a href="#workspaces">Workspaces</a>
+              <a href="#how-it-works">How it works</a>
+              <a href="#security">Security</a>
+            </nav>
+            <nav className="lp-footer__column" aria-label="Your account">
+              <h2>Account</h2>
+              <Link to="/login">Log in</Link>
+              <Link to="/register">Create an account</Link>
+            </nav>
+          </div>
+          <div className="lp-footer__bottom">
+            <span>© {new Date().getFullYear()} Vaultnary</span>
+            <span>Keep team access clear and in context.</span>
+            <Link to="/register">Create your workspace <ArrowRight size={14} /></Link>
+          </div>
         </div>
+      </footer>
+    </div>
+  )
+}
+
+function ProductPreview() {
+  return (
+    <div className="lp-preview-wrap lp-reveal" aria-label="Preview of the Vaultnary workspace">
+      <div className="lp-preview__backplate" />
+      <div className="lp-preview">
+        <div className="lp-preview__topbar">
+          <div className="lp-preview__dots"><i /><i /><i /></div>
+          <span>Vaultnary <span>/</span> Workspace</span>
+          <span className="lp-preview__avatar">N</span>
+        </div>
+        <div className="lp-preview__body">
+          <aside className="lp-preview__sidebar">
+            <div className="lp-preview__workspace-mark"><LockKeyhole size={14} /></div>
+            <span className="lp-preview__workspace-name">Acme Studio <ChevronRight size={12} /></span>
+            <span className="lp-preview__nav-label">WORKSPACE</span>
+            <span className="lp-preview__nav-item lp-preview__nav-item--active"><KeyRound size={14} /> Vault</span>
+            <span className="lp-preview__nav-item"><FolderKanban size={14} /> Projects</span>
+            <span className="lp-preview__nav-item"><Users size={14} /> Members</span>
+            <div className="lp-preview__sidebar-bottom"><ShieldCheck size={14} /> Security</div>
+          </aside>
+          <div className="lp-preview__content">
+            <div className="lp-preview__heading">
+              <div><span className="lp-preview__overline">YOUR WORKSPACE</span><h3>Credential vault</h3></div>
+              <span className="lp-preview__add">+ Add credential</span>
+            </div>
+            <div className="lp-preview__search"><Search size={13} /><span>Search credentials...</span><kbd>⌘ K</kbd></div>
+            <div className="lp-preview__summary">
+              <div><span>Credentials</span><strong>12</strong></div>
+              <div><span>Projects</span><strong>04</strong></div>
+              <div><span>Members</span><strong>06</strong></div>
+            </div>
+            <div className="lp-preview__list-header"><span>NAME</span><span>PROJECT</span><span>UPDATED</span></div>
+            <div className="lp-preview__row">
+              <span className="lp-preview__credential"><i className="lp-preview__service-icon lp-preview__service-icon--neutral">S</i><span><b>Production API</b><small>API credential</small></span></span>
+              <span className="lp-preview__project">Platform</span><span className="lp-preview__updated">Just now</span>
+            </div>
+            <div className="lp-preview__row">
+              <span className="lp-preview__credential"><i className="lp-preview__service-icon lp-preview__service-icon--green">D</i><span><b>Database access</b><small>Database credential</small></span></span>
+              <span className="lp-preview__project">Platform</span><span className="lp-preview__updated">2 hours ago</span>
+            </div>
+            <div className="lp-preview__row">
+              <span className="lp-preview__credential"><i className="lp-preview__service-icon lp-preview__service-icon--amber">G</i><span><b>Analytics account</b><small>Account credential</small></span></span>
+              <span className="lp-preview__project">Growth</span><span className="lp-preview__updated">Yesterday</span>
+            </div>
+          </div>
+        </div>
+        <div className="lp-preview__status"><span><i /> Workspace protected</span><span>Changes saved</span></div>
       </div>
-    </footer>
+      <div className="lp-preview-note"><span className="lp-preview-note__icon"><ShieldCheck size={17} /></span><span><b>One place to stay organized</b><small>People, projects, and credentials</small></span></div>
+    </div>
   )
 }
