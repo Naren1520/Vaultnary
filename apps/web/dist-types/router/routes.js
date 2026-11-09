@@ -8,6 +8,9 @@ const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('../features/auth/VerifyEmailPage'));
 const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage'));
+const TermsPage = lazy(() => import('../features/legal/TermsPage'));
+const PrivacyPage = lazy(() => import('../features/legal/PrivacyPage'));
+const SecurityOverviewPage = lazy(() => import('../features/legal/SecurityOverviewPage'));
 const AppShell = lazy(() => import('../features/shell/AppShell'));
 const VaultPage = lazy(() => import('../features/vault/VaultPage'));
 const VaultItemDetail = lazy(() => import('../features/vault/VaultItemDetail'));
@@ -45,6 +48,9 @@ export const router = createBrowserRouter([
     { path: '/register', element: wrap(RegisterPage) },
     { path: '/verify-email', element: wrap(VerifyEmailPage) },
     { path: '/forgot-password', element: wrap(ForgotPasswordPage) },
+    { path: '/terms', element: wrap(TermsPage) },
+    { path: '/privacy', element: wrap(PrivacyPage) },
+    { path: '/security', element: wrap(SecurityOverviewPage) },
     // Authenticated app
     {
         path: '/app',

@@ -1,7 +1,10 @@
-import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Check, LoaderCircle, ShieldAlert } from 'lucide-react';
 import { apiGet } from '../../services/http-client';
+import AuthPageLayout from './AuthPageLayout';
+import './auth.css';
 export default function VerifyEmailPage() {
     const [searchParams] = useSearchParams();
     const [state, setState] = useState('loading');
@@ -15,10 +18,5 @@ export default function VerifyEmailPage() {
             .then(() => setState('success'))
             .catch(() => setState('error'));
     }, [searchParams]);
-    return (_jsx("div", { style: pageStyle, children: _jsxs("div", { style: cardStyle, children: [state === 'loading' && (_jsx("p", { style: mutedStyle, role: "status", children: "Verifying your email\u2026" })), state === 'success' && (_jsxs(_Fragment, { children: [_jsx("h1", { style: headingStyle, children: "Email verified" }), _jsx("p", { style: mutedStyle, children: "Your account is now active." }), _jsx(Link, { to: "/login", style: linkStyle, children: "Sign in" })] })), state === 'error' && (_jsxs(_Fragment, { children: [_jsx("h1", { style: headingStyle, children: "Verification failed" }), _jsx("p", { style: mutedStyle, children: "The link may be expired or already used. Request a new one below." }), _jsx(Link, { to: "/login", style: linkStyle, children: "Back to sign in" })] }))] }) }));
+    return (_jsx(AuthPageLayout, { children: _jsxs("div", { className: "auth-login__form", "aria-live": "polite", children: [state === 'loading' && (_jsxs(_Fragment, { children: [_jsx("div", { className: "auth-login__status-icon auth-login__status-icon--loading", children: _jsx(LoaderCircle, { size: 23 }) }), _jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "SECURE ACCOUNT SETUP" }), _jsx("h2", { children: "Verifying your email" }), _jsx("p", { role: "status", children: "We\u2019re confirming your address and activating your account." })] })] })), state === 'success' && (_jsxs(_Fragment, { children: [_jsx("div", { className: "auth-login__status-icon", children: _jsx(Check, { size: 23 }) }), _jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "VERIFICATION COMPLETE" }), _jsx("h2", { children: "Email verified" }), _jsx("p", { children: "Your account is active. Sign in to continue to your secure workspace." })] }), _jsxs(Link, { to: "/login", className: "auth-login__submit auth-login__submit--link", children: [_jsx("span", { children: "Sign in securely" }), _jsx(ArrowRight, { size: 17 })] })] })), state === 'error' && (_jsxs(_Fragment, { children: [_jsx("div", { className: "auth-login__status-icon auth-login__status-icon--error", children: _jsx(ShieldAlert, { size: 23 }) }), _jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "VERIFICATION NEEDED" }), _jsx("h2", { children: "Couldn\u2019t verify this link" }), _jsx("p", { children: "The link may be expired or already used. Sign in or request a new verification email." })] }), _jsxs(Link, { to: "/login", className: "auth-login__submit auth-login__submit--link", children: [_jsx("span", { children: "Back to sign in" }), _jsx(ArrowRight, { size: 17 })] })] }))] }) }));
 }
-const pageStyle = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-subtle)', padding: 'var(--space-4)' };
-const cardStyle = { width: '100%', maxWidth: '24rem', backgroundColor: 'var(--color-bg)', border: 'var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'center' };
-const headingStyle = { fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-semibold)' };
-const mutedStyle = { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' };
-const linkStyle = { color: 'var(--color-accent)', fontSize: 'var(--text-sm)' };

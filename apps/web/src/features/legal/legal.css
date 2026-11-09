@@ -60,17 +60,11 @@
   object-fit: contain;
 }
 
-.public-header__nav,
 .public-header__actions {
   display: flex;
   align-items: center;
 }
 
-.public-header__nav {
-  gap: 1.8rem;
-}
-
-.public-header__nav a,
 .public-header__login {
   color: #d0d0cc;
   font-size: 0.82rem;
@@ -78,7 +72,6 @@
   text-decoration: none;
 }
 
-.public-header__nav a:hover,
 .public-header__login:hover {
   color: #fff;
 }
@@ -621,10 +614,6 @@
 
   .public-header {
     height: 64px;
-  }
-
-  .public-header__nav {
-    display: none;
   }
 
   .public-header__actions {

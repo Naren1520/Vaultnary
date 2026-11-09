@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import AuthPageLayout from './AuthPageLayout'
 import { useAuthStore } from '../../state/auth-store'
 import { apiPost } from '../../services/http-client'
 import { isValidEmail, isValidPassword } from '../../services/validation'
@@ -13,6 +15,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [globalError, setGlobalError] = useState('')
   const [rateLimitMsg, setRateLimitMsg] = useState('')
@@ -64,125 +67,84 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-page" style={pageStyle}>
+    <AuthPageLayout>
       <form
         onSubmit={handleSubmit}
         noValidate
         aria-label="Sign in"
-        style={cardStyle}
+        aria-labelledby="auth-login-title"
+        className="auth-login__form"
       >
-        <h1 style={headingStyle}>Sign in</h1>
+        <div className="auth-login__form-heading">
+          <span className="auth-login__form-kicker">SECURE WORKSPACE ACCESS</span>
+          <h2 id="auth-login-title">Welcome back</h2>
+          <p>Sign in to continue to your Vaultnary workspace.</p>
+        </div>
 
-        {globalError && (
-          <p role="alert" style={errorStyle}>{globalError}</p>
-        )}
-        {rateLimitMsg && (
-          <p role="alert" style={rateLimitStyle}>{rateLimitMsg}</p>
-        )}
+        {globalError && <p role="alert" className="auth-login__alert">{globalError}</p>}
+        {rateLimitMsg && <p role="alert" className="auth-login__alert auth-login__alert--muted">{rateLimitMsg}</p>}
 
-        <div style={fieldGroup}>
-          <label htmlFor="email" style={labelStyle}>Email</label>
+        <div className="auth-login__field">
+          <label htmlFor="email">Email address</label>
           <input
             id="email"
             type="email"
             autoComplete="email"
+            placeholder="you@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             aria-describedby={fieldErrors.email ? 'email-error' : undefined}
             aria-invalid={!!fieldErrors.email}
-            style={inputStyle}
             disabled={loading}
           />
-          {fieldErrors.email && (
-            <span id="email-error" role="alert" style={fieldErrorStyle}>{fieldErrors.email}</span>
-          )}
+          {fieldErrors.email && <span id="email-error" role="alert" className="auth-login__field-error">{fieldErrors.email}</span>}
         </div>
 
-        <div style={fieldGroup}>
-          <label htmlFor="password" style={labelStyle}>Password</label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-            aria-invalid={!!fieldErrors.password}
-            style={inputStyle}
-            disabled={loading}
-          />
-          {fieldErrors.password && (
-            <span id="password-error" role="alert" style={fieldErrorStyle}>{fieldErrors.password}</span>
-          )}
+        <div className="auth-login__field">
+          <div className="auth-login__label-row">
+            <label htmlFor="password">Password</label>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </div>
+          <div className="auth-login__password-wrap">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+              aria-invalid={!!fieldErrors.password}
+              disabled={loading}
+            />
+            <button
+              className="auth-login__password-toggle"
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+              disabled={loading}
+            >
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+          {fieldErrors.password && <span id="password-error" role="alert" className="auth-login__field-error">{fieldErrors.password}</span>}
         </div>
 
-        <button type="submit" disabled={loading} style={submitStyle}>
-          {loading ? 'Signing in…' : 'Sign in'}
+        <button type="submit" disabled={loading} className="auth-login__submit">
+          <span>{loading ? 'Signing in…' : 'Sign in securely'}</span>
+          <ArrowRight size={17} aria-hidden="true" />
         </button>
 
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 'var(--space-3)' }}>
-          No account?{' '}
-          <Link to="/register" style={{ color: 'var(--color-accent)' }}>Register</Link>
-        </p>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
-          <Link to="/forgot-password" style={{ color: 'var(--color-accent)' }}>Forgot password?</Link>
+        <div className="auth-login__form-assurance">
+          <ShieldCheck size={15} />
+          <span>Your credentials are protected in transit.</span>
+        </div>
+
+        <p className="auth-login__register">
+          New to Vaultnary? <Link to="/register">Create an account <ArrowRight size={14} /></Link>
         </p>
       </form>
-    </div>
+    </AuthPageLayout>
   )
 }
-
-const pageStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: 'var(--color-bg-subtle)',
-  padding: 'var(--space-4)',
-}
-const cardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '24rem',
-  backgroundColor: 'var(--color-bg)',
-  border: 'var(--border-card)',
-  borderRadius: 'var(--radius-lg)',
-  padding: 'var(--space-8)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-}
-const headingStyle: React.CSSProperties = {
-  fontSize: 'var(--text-xl)',
-  fontWeight: 'var(--font-weight-semibold)',
-  textAlign: 'center',
-}
-const fieldGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }
-const labelStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }
-const inputStyle: React.CSSProperties = {
-  padding: 'var(--space-2) var(--space-3)',
-  border: 'var(--border-input)',
-  borderRadius: 'var(--radius-md)',
-  fontSize: 'var(--text-base)',
-  width: '100%',
-}
-const submitStyle: React.CSSProperties = {
-  padding: 'var(--space-2) var(--space-4)',
-  backgroundColor: 'var(--color-accent)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 'var(--radius-md)',
-  fontWeight: 'var(--font-weight-medium)',
-  fontSize: 'var(--text-base)',
-  cursor: 'pointer',
-  width: '100%',
-}
-const errorStyle: React.CSSProperties = {
-  padding: 'var(--space-2) var(--space-3)',
-  backgroundColor: 'rgba(220,38,38,0.08)',
-  border: '1px solid var(--color-danger)',
-  borderRadius: 'var(--radius-md)',
-  color: 'var(--color-danger)',
-  fontSize: 'var(--text-sm)',
-}
-const rateLimitStyle: React.CSSProperties = { ...errorStyle, borderColor: 'var(--color-text-muted)', backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-muted)' }
-const fieldErrorStyle: React.CSSProperties = { fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }

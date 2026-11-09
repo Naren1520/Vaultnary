@@ -137,12 +137,6 @@ export default function LandingPage() {
             <img src={logoUrl} alt="Vaultnary" />
             <span aria-hidden="true">Vaultnary</span>
           </Link>
-          <nav className="lp-nav__links" aria-label="Main navigation">
-            <a href="#product">Product</a>
-            <a href="#workspaces">Workspaces</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#security">Security</a>
-          </nav>
           <div className="lp-nav__actions">
             <Link to="/login" className="lp-nav__login">Log in</Link>
             <Link to="/register" className="lp-button lp-button--small">

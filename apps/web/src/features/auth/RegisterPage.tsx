@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight, Check, UserRoundPlus } from 'lucide-react'
 import { apiPost } from '../../services/http-client'
 import { isValidEmail, isValidPassword } from '../../services/validation'
 import { ValidationError, RateLimitError, getErrorMessage } from '../../services/error-handler'
 import type { RegisterRequest } from './types'
+import AuthPageLayout from './AuthPageLayout'
 import './auth.css'
 
 export default function RegisterPage() {
@@ -48,75 +50,91 @@ export default function RegisterPage() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="auth-page" style={pageStyle}>
-        <div style={cardStyle}>
-          <h1 style={headingStyle}>Check your email</h1>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
-            If an account was created, a verification link has been sent to your email address.
-          </p>
-          <Link to="/login" style={{ color: 'var(--color-accent)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
-            Back to sign in
+  return (
+    <AuthPageLayout>
+      {success ? (
+        <div className="auth-login__form" aria-labelledby="register-success-title">
+          <div className="auth-login__status-icon"><Check size={23} /></div>
+          <div className="auth-login__form-heading">
+            <span className="auth-login__form-kicker">ONE MORE STEP</span>
+            <h2 id="register-success-title">Check your email</h2>
+            <p>If an account was created, a verification link has been sent to your email address.</p>
+          </div>
+          <Link to="/login" className="auth-login__submit auth-login__submit--link">
+            <span>Back to sign in</span><ArrowRight size={17} />
           </Link>
         </div>
-      </div>
-    )
-  }
+      ) : (
+        <form onSubmit={handleSubmit} noValidate aria-label="Create account" className="auth-login__form">
+          <div className="auth-login__form-heading">
+            <span className="auth-login__form-kicker">CREATE YOUR SECURE WORKSPACE</span>
+            <h2>Create account</h2>
+            <p>Set up your account to start organizing team access.</p>
+          </div>
+          {globalError && <p role="alert" className="auth-login__alert">{globalError}</p>}
 
-  return (
-    <div className="auth-page" style={pageStyle}>
-      <form onSubmit={handleSubmit} noValidate aria-label="Create account" style={cardStyle}>
-        <h1 style={headingStyle}>Create account</h1>
-        {globalError && <p role="alert" style={errorStyle}>{globalError}</p>}
-
-        {(['email', 'password', 'confirm'] as const).map((field) => (
-          <div key={field} style={fieldGroup}>
-            <label htmlFor={field} style={labelStyle}>
-              {field === 'confirm' ? 'Confirm password' : field.charAt(0).toUpperCase() + field.slice(1)}
-            </label>
+          <div className="auth-login__field">
+            <label htmlFor="email">Email address</label>
             <input
-              id={field}
-              type={field === 'email' ? 'email' : 'password'}
-              autoComplete={field === 'email' ? 'email' : field === 'password' ? 'new-password' : 'new-password'}
-              value={field === 'email' ? email : field === 'password' ? password : confirm}
-              onChange={(e) => {
-                if (field === 'email') setEmail(e.target.value)
-                else if (field === 'password') setPassword(e.target.value)
-                else setConfirm(e.target.value)
-              }}
-              aria-describedby={fieldErrors[field] ? `${field}-error` : undefined}
-              aria-invalid={!!fieldErrors[field]}
-              style={inputStyle}
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+              aria-invalid={!!fieldErrors.email}
               disabled={loading}
             />
-            {fieldErrors[field] && (
-              <span id={`${field}-error`} role="alert" style={fieldErrorStyle}>{fieldErrors[field]}</span>
-            )}
+            {fieldErrors.email && <span id="email-error" role="alert" className="auth-login__field-error">{fieldErrors.email}</span>}
           </div>
-        ))}
 
-        <button type="submit" disabled={loading} style={submitStyle}>
-          {loading ? 'Creating account…' : 'Create account'}
-        </button>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-          By creating an account, you acknowledge the <Link to="/terms" style={{ color: 'var(--color-accent)' }}>Terms</Link>
-          {' '}and <Link to="/privacy" style={{ color: 'var(--color-accent)' }}>Privacy Notice</Link>.
-        </p>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
-          Already have an account? <Link to="/login" style={{ color: 'var(--color-accent)' }}>Sign in</Link>
-        </p>
-      </form>
-    </div>
+          <div className="auth-login__field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 12 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-describedby={fieldErrors.password ? 'password-hint password-error' : 'password-hint'}
+              aria-invalid={!!fieldErrors.password}
+              disabled={loading}
+            />
+            <span id="password-hint" className="auth-login__field-hint">Use 12–128 characters.</span>
+            {fieldErrors.password && <span id="password-error" role="alert" className="auth-login__field-error">{fieldErrors.password}</span>}
+          </div>
+
+          <div className="auth-login__field">
+            <label htmlFor="confirm">Confirm password</label>
+            <input
+              id="confirm"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              aria-describedby={fieldErrors.confirm ? 'confirm-error' : undefined}
+              aria-invalid={!!fieldErrors.confirm}
+              disabled={loading}
+            />
+            {fieldErrors.confirm && <span id="confirm-error" role="alert" className="auth-login__field-error">{fieldErrors.confirm}</span>}
+          </div>
+
+          <button type="submit" disabled={loading} className="auth-login__submit">
+            <span>{loading ? 'Creating account…' : 'Create secure account'}</span>
+            <UserRoundPlus size={17} aria-hidden="true" />
+          </button>
+
+          <p className="auth-login__legal">
+            By creating an account, you acknowledge the <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Notice</Link>.
+          </p>
+          <p className="auth-login__register">
+            Already have an account? <Link to="/login">Sign in <ArrowRight size={14} /></Link>
+          </p>
+        </form>
+      )}
+    </AuthPageLayout>
   )
 }
-
-const pageStyle: React.CSSProperties = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-subtle)', padding: 'var(--space-4)' }
-const cardStyle: React.CSSProperties = { width: '100%', maxWidth: '24rem', backgroundColor: 'var(--color-bg)', border: 'var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }
-const headingStyle: React.CSSProperties = { fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-semibold)', textAlign: 'center' }
-const fieldGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }
-const labelStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }
-const inputStyle: React.CSSProperties = { padding: 'var(--space-2) var(--space-3)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', width: '100%' }
-const submitStyle: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', backgroundColor: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--text-base)', cursor: 'pointer', width: '100%' }
-const errorStyle: React.CSSProperties = { padding: 'var(--space-2) var(--space-3)', backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }
-const fieldErrorStyle: React.CSSProperties = { fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }

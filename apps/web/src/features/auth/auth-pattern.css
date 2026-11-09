@@ -1,0 +1,29 @@
+.auth-pattern {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  --pattern-size: 200px;
+  --pattern-color-one: #1d1d1d;
+  --pattern-color-two: #4e4f51;
+  --pattern-color-three: #3c3c3c;
+  background:
+    repeating-conic-gradient(
+        from 30deg,
+        #0000 0 120deg,
+        var(--pattern-color-three) 0 180deg
+      )
+      calc(0.5 * var(--pattern-size)) calc(0.5 * var(--pattern-size) * 0.577),
+    repeating-conic-gradient(
+      from 30deg,
+      var(--pattern-color-one) 0 60deg,
+      var(--pattern-color-two) 0 120deg,
+      var(--pattern-color-three) 0 180deg
+    );
+  background-size: var(--pattern-size) calc(var(--pattern-size) * 0.577);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-pattern {
+    background-attachment: scroll;
+  }
+}

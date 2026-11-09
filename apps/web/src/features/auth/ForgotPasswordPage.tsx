@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check, Mail } from 'lucide-react'
 import { apiPost } from '../../services/http-client'
 import { isValidEmail } from '../../services/validation'
 import type { ForgotPasswordRequest } from './types'
+import AuthPageLayout from './AuthPageLayout'
 import './auth.css'
 
 export default function ForgotPasswordPage() {
@@ -27,51 +29,55 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="auth-page" style={pageStyle}>
-      <div style={cardStyle}>
-        <h1 style={headingStyle}>Reset password</h1>
-        {submitted ? (
-          <>
-            <p style={mutedStyle}>
-              If an account exists for that address, a reset link has been sent.
-            </p>
-            <Link to="/login" style={linkStyle}>Back to sign in</Link>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <div style={fieldGroup}>
-              <label htmlFor="email" style={labelStyle}>Email</label>
+    <AuthPageLayout>
+      {submitted ? (
+        <div className="auth-login__form" aria-labelledby="reset-sent-title">
+          <div className="auth-login__status-icon"><Check size={23} /></div>
+          <div className="auth-login__form-heading">
+            <span className="auth-login__form-kicker">CHECK YOUR INBOX</span>
+            <h2 id="reset-sent-title">If there’s an account, you’ll hear from us</h2>
+            <p>If an account exists for that address, a reset link has been sent.</p>
+          </div>
+          <Link to="/login" className="auth-login__text-link">
+            <ArrowLeft size={14} /> Back to sign in
+          </Link>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate aria-label="Reset password" className="auth-login__form">
+          <div className="auth-login__form-heading">
+            <span className="auth-login__form-kicker">ACCOUNT RECOVERY</span>
+            <h2>Reset password</h2>
+            <p>Enter your account email and we’ll send a secure reset link if it’s registered.</p>
+          </div>
+
+          <div className="auth-login__field">
+            <label htmlFor="email">Email address</label>
+            <div className="auth-login__input-with-icon">
+              <Mail size={16} aria-hidden="true" />
               <input
                 id="email"
                 type="email"
                 autoComplete="email"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 aria-describedby={emailError ? 'email-error' : undefined}
                 aria-invalid={!!emailError}
-                style={inputStyle}
                 disabled={loading}
               />
-              {emailError && <span id="email-error" role="alert" style={fieldErrorStyle}>{emailError}</span>}
             </div>
-            <button type="submit" disabled={loading} style={submitStyle}>
-              {loading ? 'Sending…' : 'Send reset link'}
-            </button>
-            <Link to="/login" style={{ ...linkStyle, textAlign: 'center' }}>Back to sign in</Link>
-          </form>
-        )}
-      </div>
-    </div>
+            {emailError && <span id="email-error" role="alert" className="auth-login__field-error">{emailError}</span>}
+          </div>
+
+          <button type="submit" disabled={loading} className="auth-login__submit">
+            <span>{loading ? 'Sending…' : 'Send reset link'}</span>
+            <ArrowRight size={17} aria-hidden="true" />
+          </button>
+          <Link to="/login" className="auth-login__text-link">
+            <ArrowLeft size={14} /> Back to sign in
+          </Link>
+        </form>
+      )}
+    </AuthPageLayout>
   )
 }
-
-const pageStyle: React.CSSProperties = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-subtle)', padding: 'var(--space-4)' }
-const cardStyle: React.CSSProperties = { width: '100%', maxWidth: '24rem', backgroundColor: 'var(--color-bg)', border: 'var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }
-const headingStyle: React.CSSProperties = { fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-semibold)', textAlign: 'center' }
-const mutedStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }
-const linkStyle: React.CSSProperties = { color: 'var(--color-accent)', fontSize: 'var(--text-sm)' }
-const fieldGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }
-const labelStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }
-const inputStyle: React.CSSProperties = { padding: 'var(--space-2) var(--space-3)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', width: '100%' }
-const submitStyle: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', backgroundColor: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--text-base)', cursor: 'pointer', width: '100%' }
-const fieldErrorStyle: React.CSSProperties = { fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }

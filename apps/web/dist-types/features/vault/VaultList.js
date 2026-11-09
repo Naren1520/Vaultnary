@@ -28,7 +28,7 @@ const columns = [
         key: 'last_accessed_at',
         header: 'Last accessed',
         sortable: true,
-        render: (row) => row.last_accessed_at ? (_jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }, children: new Date(row.last_accessed_at).toLocaleDateString() })) : (_jsx("span", { style: { color: 'var(--color-border)' }, children: "\u2014" })),
+        render: (row) => row.last_accessed_at ? (_jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }, children: new Date(row.last_accessed_at).toLocaleDateString() })) : (_jsx("span", { style: { color: 'var(--color-border)' }, children: "-" })),
         width: '9rem',
     },
 ];

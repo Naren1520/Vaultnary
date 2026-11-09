@@ -71,12 +71,10 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   filter: brightness(0) invert(1);
 }
 
-.lp-nav:not(.lp-nav--solid) .lp-nav__links a,
 .lp-nav:not(.lp-nav--solid) .lp-nav__login {
   color: #e4e4df;
 }
 
-.lp-nav:not(.lp-nav--solid) .lp-nav__links a:hover,
 .lp-nav:not(.lp-nav--solid) .lp-nav__login:hover {
   color: #fff;
 }
@@ -118,12 +116,10 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   letter-spacing: -0.045em;
 }
 
-.lp-nav--solid .lp-nav__links a,
 .lp-nav--solid .lp-nav__login {
   color: #d0d0cc;
 }
 
-.lp-nav--solid .lp-nav__links a:hover,
 .lp-nav--solid .lp-nav__login:hover {
   color: #fff;
 }
@@ -164,18 +160,11 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   object-fit: contain;
 }
 
-.lp-nav__links,
 .lp-nav__actions {
   display: flex;
   align-items: center;
 }
 
-.lp-nav__links {
-  gap: 2rem;
-  margin-left: 4rem;
-}
-
-.lp-nav__links a,
 .lp-nav__login {
   color: #52524f;
   font-size: 0.86rem;
@@ -184,7 +173,6 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   transition: color 150ms ease;
 }
 
-.lp-nav__links a:hover,
 .lp-nav__login:hover {
   color: var(--lp-accent);
 }
@@ -1145,10 +1133,6 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
 
   .lp-nav.lp-nav--solid {
     background: #1a1a18;
-  }
-
-  .lp-nav__links {
-    display: none;
   }
 
   .lp-nav__actions {

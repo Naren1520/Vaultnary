@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowRight, Check, LoaderCircle, ShieldAlert } from 'lucide-react'
 import { apiGet } from '../../services/http-client'
+import AuthPageLayout from './AuthPageLayout'
 import './auth.css'
 
 type State = 'loading' | 'success' | 'error'
@@ -19,32 +21,45 @@ export default function VerifyEmailPage() {
   }, [searchParams])
 
   return (
-    <div className="auth-page" style={pageStyle}>
-      <div style={cardStyle}>
+    <AuthPageLayout>
+      <div className="auth-login__form" aria-live="polite">
         {state === 'loading' && (
-          <p style={mutedStyle} role="status">Verifying your email…</p>
+          <>
+            <div className="auth-login__status-icon auth-login__status-icon--loading"><LoaderCircle size={23} /></div>
+            <div className="auth-login__form-heading">
+              <span className="auth-login__form-kicker">SECURE ACCOUNT SETUP</span>
+              <h2>Verifying your email</h2>
+              <p role="status">We’re confirming your address and activating your account.</p>
+            </div>
+          </>
         )}
         {state === 'success' && (
           <>
-            <h1 style={headingStyle}>Email verified</h1>
-            <p style={mutedStyle}>Your account is now active.</p>
-            <Link to="/login" style={linkStyle}>Sign in</Link>
+            <div className="auth-login__status-icon"><Check size={23} /></div>
+            <div className="auth-login__form-heading">
+              <span className="auth-login__form-kicker">VERIFICATION COMPLETE</span>
+              <h2>Email verified</h2>
+              <p>Your account is active. Sign in to continue to your secure workspace.</p>
+            </div>
+            <Link to="/login" className="auth-login__submit auth-login__submit--link">
+              <span>Sign in securely</span><ArrowRight size={17} />
+            </Link>
           </>
         )}
         {state === 'error' && (
           <>
-            <h1 style={headingStyle}>Verification failed</h1>
-            <p style={mutedStyle}>The link may be expired or already used. Request a new one below.</p>
-            <Link to="/login" style={linkStyle}>Back to sign in</Link>
+            <div className="auth-login__status-icon auth-login__status-icon--error"><ShieldAlert size={23} /></div>
+            <div className="auth-login__form-heading">
+              <span className="auth-login__form-kicker">VERIFICATION NEEDED</span>
+              <h2>Couldn’t verify this link</h2>
+              <p>The link may be expired or already used. Sign in or request a new verification email.</p>
+            </div>
+            <Link to="/login" className="auth-login__submit auth-login__submit--link">
+              <span>Back to sign in</span><ArrowRight size={17} />
+            </Link>
           </>
         )}
       </div>
-    </div>
+    </AuthPageLayout>
   )
 }
-
-const pageStyle: React.CSSProperties = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-subtle)', padding: 'var(--space-4)' }
-const cardStyle: React.CSSProperties = { width: '100%', maxWidth: '24rem', backgroundColor: 'var(--color-bg)', border: 'var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'center' }
-const headingStyle: React.CSSProperties = { fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-semibold)' }
-const mutedStyle: React.CSSProperties = { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }
-const linkStyle: React.CSSProperties = { color: 'var(--color-accent)', fontSize: 'var(--text-sm)' }

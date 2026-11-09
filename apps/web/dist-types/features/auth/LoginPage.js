@@ -1,15 +1,19 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import AuthPageLayout from './AuthPageLayout';
 import { useAuthStore } from '../../state/auth-store';
 import { apiPost } from '../../services/http-client';
 import { isValidEmail, isValidPassword } from '../../services/validation';
 import { ValidationError, RateLimitError, getErrorMessage } from '../../services/error-handler';
+import './auth.css';
 export default function LoginPage() {
     const navigate = useNavigate();
     const setCsrfToken = useAuthStore((s) => s.setCsrfToken);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const [globalError, setGlobalError] = useState('');
     const [rateLimitMsg, setRateLimitMsg] = useState('');
@@ -60,59 +64,5 @@ export default function LoginPage() {
             setLoading(false);
         }
     }
-    return (_jsx("div", { style: pageStyle, children: _jsxs("form", { onSubmit: handleSubmit, noValidate: true, "aria-label": "Sign in", style: cardStyle, children: [_jsx("h1", { style: headingStyle, children: "Sign in" }), globalError && (_jsx("p", { role: "alert", style: errorStyle, children: globalError })), rateLimitMsg && (_jsx("p", { role: "alert", style: rateLimitStyle, children: rateLimitMsg })), _jsxs("div", { style: fieldGroup, children: [_jsx("label", { htmlFor: "email", style: labelStyle, children: "Email" }), _jsx("input", { id: "email", type: "email", autoComplete: "email", value: email, onChange: (e) => setEmail(e.target.value), "aria-describedby": fieldErrors.email ? 'email-error' : undefined, "aria-invalid": !!fieldErrors.email, style: inputStyle, disabled: loading }), fieldErrors.email && (_jsx("span", { id: "email-error", role: "alert", style: fieldErrorStyle, children: fieldErrors.email }))] }), _jsxs("div", { style: fieldGroup, children: [_jsx("label", { htmlFor: "password", style: labelStyle, children: "Password" }), _jsx("input", { id: "password", type: "password", autoComplete: "current-password", value: password, onChange: (e) => setPassword(e.target.value), "aria-describedby": fieldErrors.password ? 'password-error' : undefined, "aria-invalid": !!fieldErrors.password, style: inputStyle, disabled: loading }), fieldErrors.password && (_jsx("span", { id: "password-error", role: "alert", style: fieldErrorStyle, children: fieldErrors.password }))] }), _jsx("button", { type: "submit", disabled: loading, style: submitStyle, children: loading ? 'Signing in…' : 'Sign in' }), _jsxs("p", { style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 'var(--space-3)' }, children: ["No account?", ' ', _jsx(Link, { to: "/register", style: { color: 'var(--color-accent)' }, children: "Register" })] }), _jsx("p", { style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }, children: _jsx(Link, { to: "/forgot-password", style: { color: 'var(--color-accent)' }, children: "Forgot password?" }) })] }) }));
+    return (_jsx(AuthPageLayout, { children: _jsxs("form", { onSubmit: handleSubmit, noValidate: true, "aria-label": "Sign in", "aria-labelledby": "auth-login-title", className: "auth-login__form", children: [_jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "SECURE WORKSPACE ACCESS" }), _jsx("h2", { id: "auth-login-title", children: "Welcome back" }), _jsx("p", { children: "Sign in to continue to your Vaultnary workspace." })] }), globalError && _jsx("p", { role: "alert", className: "auth-login__alert", children: globalError }), rateLimitMsg && _jsx("p", { role: "alert", className: "auth-login__alert auth-login__alert--muted", children: rateLimitMsg }), _jsxs("div", { className: "auth-login__field", children: [_jsx("label", { htmlFor: "email", children: "Email address" }), _jsx("input", { id: "email", type: "email", autoComplete: "email", placeholder: "you@company.com", value: email, onChange: (e) => setEmail(e.target.value), "aria-describedby": fieldErrors.email ? 'email-error' : undefined, "aria-invalid": !!fieldErrors.email, disabled: loading }), fieldErrors.email && _jsx("span", { id: "email-error", role: "alert", className: "auth-login__field-error", children: fieldErrors.email })] }), _jsxs("div", { className: "auth-login__field", children: [_jsxs("div", { className: "auth-login__label-row", children: [_jsx("label", { htmlFor: "password", children: "Password" }), _jsx(Link, { to: "/forgot-password", children: "Forgot password?" })] }), _jsxs("div", { className: "auth-login__password-wrap", children: [_jsx("input", { id: "password", type: showPassword ? 'text' : 'password', autoComplete: "current-password", placeholder: "Enter your password", value: password, onChange: (e) => setPassword(e.target.value), "aria-describedby": fieldErrors.password ? 'password-error' : undefined, "aria-invalid": !!fieldErrors.password, disabled: loading }), _jsx("button", { className: "auth-login__password-toggle", type: "button", onClick: () => setShowPassword((visible) => !visible), "aria-label": showPassword ? 'Hide password' : 'Show password', "aria-pressed": showPassword, disabled: loading, children: showPassword ? _jsx(EyeOff, { size: 17 }) : _jsx(Eye, { size: 17 }) })] }), fieldErrors.password && _jsx("span", { id: "password-error", role: "alert", className: "auth-login__field-error", children: fieldErrors.password })] }), _jsxs("button", { type: "submit", disabled: loading, className: "auth-login__submit", children: [_jsx("span", { children: loading ? 'Signing in…' : 'Sign in securely' }), _jsx(ArrowRight, { size: 17, "aria-hidden": "true" })] }), _jsxs("div", { className: "auth-login__form-assurance", children: [_jsx(ShieldCheck, { size: 15 }), _jsx("span", { children: "Your credentials are protected in transit." })] }), _jsxs("p", { className: "auth-login__register", children: ["New to Vaultnary? ", _jsxs(Link, { to: "/register", children: ["Create an account ", _jsx(ArrowRight, { size: 14 })] })] })] }) }));
 }
-const pageStyle = {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'var(--color-bg-subtle)',
-    padding: 'var(--space-4)',
-};
-const cardStyle = {
-    width: '100%',
-    maxWidth: '24rem',
-    backgroundColor: 'var(--color-bg)',
-    border: 'var(--border-card)',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-8)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--space-4)',
-};
-const headingStyle = {
-    fontSize: 'var(--text-xl)',
-    fontWeight: 'var(--font-weight-semibold)',
-    textAlign: 'center',
-};
-const fieldGroup = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
-const labelStyle = { fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' };
-const inputStyle = {
-    padding: 'var(--space-2) var(--space-3)',
-    border: 'var(--border-input)',
-    borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--text-base)',
-    width: '100%',
-};
-const submitStyle = {
-    padding: 'var(--space-2) var(--space-4)',
-    backgroundColor: 'var(--color-accent)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    fontWeight: 'var(--font-weight-medium)',
-    fontSize: 'var(--text-base)',
-    cursor: 'pointer',
-    width: '100%',
-};
-const errorStyle = {
-    padding: 'var(--space-2) var(--space-3)',
-    backgroundColor: 'rgba(220,38,38,0.08)',
-    border: '1px solid var(--color-danger)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-danger)',
-    fontSize: 'var(--text-sm)',
-};
-const rateLimitStyle = { ...errorStyle, borderColor: 'var(--color-text-muted)', backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-muted)' };
-const fieldErrorStyle = { fontSize: 'var(--text-xs)', color: 'var(--color-danger)' };

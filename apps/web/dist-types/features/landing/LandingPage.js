@@ -1,143 +1,110 @@
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useEffect, useRef, useState } from 'react';
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, Shield, Users, Eye, Share2, KeyRound, ArrowRight } from 'lucide-react';
+import { ArrowDown, ArrowRight, Check, ChevronRight, Clock3, Eye, Fingerprint, FolderKanban, KeyRound, LockKeyhole, ShieldCheck, Users, } from 'lucide-react';
+import logoUrl from '../../assets/logo.png';
+import LaptopCard from './components/LaptopCard';
+import VantaTopology from './components/VantaTopology';
+import WorkspacePreview from './components/WorkspacePreview';
 import './landing.css';
-export default function LandingPage() {
-    useEffect(() => {
-        const els = document.querySelectorAll('.reveal');
-        const obs = new IntersectionObserver((entries) => {
-            entries.forEach((e) => {
-                if (e.isIntersecting) {
-                    e.target.classList.add('is-visible');
-                    obs.unobserve(e.target);
-                }
-            });
-        }, { threshold: 0.12 });
-        els.forEach((el) => obs.observe(el));
-        return () => obs.disconnect();
-    }, []);
-    return (_jsxs("div", { className: "lp", children: [_jsx(LPNav, {}), _jsx(LPHero, {}), _jsx(LPLogos, {}), _jsx(LPFeatures, {}), _jsx(LPSteps, {}), _jsx(LPQuote, {}), _jsx(LPCta, {}), _jsx(LPFooter, {})] }));
-}
-function LPNav() {
-    const [solid, setSolid] = useState(false);
-    const [imgFailed, setImgFailed] = useState(false);
-    const logoUrl = new URL('../../assets/logo.png', import.meta.url).href;
-    useEffect(() => {
-        const fn = () => setSolid(window.scrollY > 32);
-        window.addEventListener('scroll', fn, { passive: true });
-        return () => window.removeEventListener('scroll', fn);
-    }, []);
-    return (_jsx("header", { className: `lp-nav ${solid ? 'lp-nav--solid' : ''}`, children: _jsxs("div", { className: "lp-nav__row", children: [_jsx(Link, { to: "/", className: "lp-nav__brand", children: imgFailed ? (_jsxs(_Fragment, { children: [_jsx(Lock, { size: 18, strokeWidth: 2, "aria-hidden": "true" }), "Vaultnary"] })) : (_jsx("img", { src: logoUrl, alt: "Vaultnary", onError: () => setImgFailed(true), style: { height: '2rem', width: 'auto', objectFit: 'contain' } })) }), _jsxs("nav", { "aria-label": "Site navigation", className: "lp-nav__links", children: [_jsx("a", { href: "#features", className: "lp-nav__link", children: "Features" }), _jsx("a", { href: "#steps", className: "lp-nav__link", children: "How it works" }), _jsx(Link, { to: "/login", className: "lp-nav__link", children: "Sign in" }), _jsx(Link, { to: "/register", className: "lp-btn-outline", children: "Get started" })] })] }) }));
-}
-function LPHero() {
-    const bgRef = useRef(null);
-    useEffect(() => {
-        const fn = () => {
-            if (bgRef.current)
-                bgRef.current.style.transform = `translateY(${window.scrollY * 0.28}px)`;
-        };
-        window.addEventListener('scroll', fn, { passive: true });
-        return () => window.removeEventListener('scroll', fn);
-    }, []);
-    return (_jsxs("section", { className: "lp-hero", "aria-label": "Introduction", children: [_jsx("div", { className: "lp-hero__bg", ref: bgRef }), _jsx("div", { className: "lp-hero__scrim", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-hero__body", children: [_jsx("p", { className: "lp-hero__eyebrow reveal", children: "Credential management, done right" }), _jsxs("h1", { className: "lp-hero__h1 reveal", children: ["Every password.", _jsx("br", {}), "Every key.", _jsx("br", {}), "Always secure."] }), _jsx("p", { className: "lp-hero__sub reveal", children: "The one place your team stores, organises, and safely shares credentials -without ever putting anyone at risk." }), _jsxs("div", { className: "lp-hero__actions reveal", children: [_jsxs(Link, { to: "/register", className: "lp-btn-primary", children: ["Start for free ", _jsx(ArrowRight, { size: 15, strokeWidth: 2.5, "aria-hidden": "true" })] }), _jsx(Link, { to: "/login", className: "lp-btn-ghost", children: "Sign in to vault" })] })] })] }));
-}
-const logoNames = ['Acme Corp', 'Horizon Labs', 'Stackflow', 'Relay Inc', 'Northgate'];
-function LPLogos() {
-    return (_jsx("div", { className: "lp-logos", "aria-label": "Trusted by teams like", children: _jsxs("div", { className: "lp-wrap lp-logos__row", children: [_jsx("span", { className: "lp-logos__label", children: "Trusted by engineering teams at" }), logoNames.map((n) => (_jsx("span", { className: "lp-logos__name", children: n }, n)))] }) }));
-}
 const features = [
     {
-        icon: Lock,
-        title: 'Yours and only yours',
-        body: 'Everything you save is locked before it leaves your device. Nobody else -including us -can read your secrets.',
-        img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=720&q=80&auto=format&fit=crop',
-        alt: 'A single key on a clean surface',
+        icon: LockKeyhole,
+        title: 'Private by design',
+        body: 'Keep sensitive values encrypted in your vault, with control over when they are unlocked.',
+        detail: 'A calmer place for sensitive work',
     },
     {
         icon: Users,
-        title: 'Share access, not passwords',
-        body: 'Give a teammate access to exactly one credential. Control who sees what, and take it back in a single click.',
-        img: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=720&q=80&auto=format&fit=crop',
-        alt: 'Two colleagues reviewing work together',
+        title: 'Share with intention',
+        body: 'Invite teammates to the workspace and manage who can access shared credentials.',
+        detail: 'Access that follows your team',
     },
     {
-        icon: KeyRound,
-        title: 'Every type of credential',
-        body: 'Passwords, API tokens, SSH keys, two-factor codes, database logins -all in one organised, searchable vault.',
-        img: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=720&q=80&auto=format&fit=crop',
-        alt: 'Organised key rack',
+        icon: FolderKanban,
+        title: 'Everything in context',
+        body: 'Organize credentials around workspaces, projects, and the services they support.',
+        detail: 'Less hunting, more doing',
     },
     {
         icon: Eye,
-        title: 'A record of everything',
-        body: 'See exactly who accessed what and when. A permanent log your team can rely on for accountability and audit.',
-        img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=720&q=80&auto=format&fit=crop',
-        alt: 'Clean data dashboard',
-    },
-    {
-        icon: Share2,
-        title: 'Organised around your projects',
-        body: 'Tag credentials to the projects and environments they belong to. Find the right key the moment you need it.',
-        img: 'https://images.unsplash.com/photo-1507925921958-8a62f3d1a50d?w=720&q=80&auto=format&fit=crop',
-        alt: 'Neatly organised folders on a desk',
-    },
-    {
-        icon: Shield,
-        title: 'Never locked out again',
-        body: 'Set a recovery phrase once. If you ever lose access, your vault is still yours to get back -no support ticket needed.',
-        img: 'https://images.unsplash.com/photo-1433888104895-5b54e9988929?w=720&q=80&auto=format&fit=crop',
-        alt: 'Spare key on a hook',
+        title: 'Know what happened',
+        body: 'Review security activity and audit events when your team needs a clear history.',
+        detail: 'Visibility when it matters',
     },
 ];
-function LPFeatures() {
-    return (_jsx("section", { id: "features", className: "lp-features", "aria-label": "Features", children: _jsxs("div", { className: "lp-wrap", children: [_jsxs("div", { className: "lp-section-hd reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "What you get" }), _jsx("h2", { className: "lp-h2", children: "Built for teams who can't afford a breach" }), _jsx("p", { className: "lp-lead", children: "Stop emailing passwords. Stop using shared accounts. Start doing it properly." })] }), _jsx("div", { className: "lp-features__list", children: features.map((f, i) => _jsx(FeatureRow, { f: f, flip: i % 2 !== 0 }, f.title)) })] }) }));
-}
-function FeatureRow({ f, flip }) {
-    const ref = useRef(null);
-    const [vis, setVis] = useState(false);
-    useEffect(() => {
-        const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) {
-            setVis(true);
-            obs.disconnect();
-        } }, { threshold: 0.15 });
-        if (ref.current)
-            obs.observe(ref.current);
-        return () => obs.disconnect();
-    }, []);
-    return (_jsxs("div", { ref: ref, className: `lp-frow ${flip ? 'lp-frow--flip' : ''} ${vis ? 'lp-frow--vis' : ''}`, children: [_jsx("div", { className: "lp-frow__img-wrap", children: _jsx("img", { src: f.img, alt: f.alt, className: "lp-frow__img", loading: "lazy" }) }), _jsxs("div", { className: "lp-frow__copy", children: [_jsx(f.icon, { size: 28, strokeWidth: 1.5, className: "lp-frow__icon", "aria-hidden": "true" }), _jsx("h3", { className: "lp-frow__title", children: f.title }), _jsx("p", { className: "lp-frow__body", children: f.body })] })] }));
-}
 const steps = [
-    { n: '01', title: 'Create your vault', body: 'Sign up with your email address. Your private vault is ready in under a minute.' },
-    { n: '02', title: 'Add your credentials', body: 'Type in a password, paste an API key, or store an SSH key -any kind of secret.' },
-    { n: '03', title: 'Unlock only when you need to', body: 'Your vault stays closed until you open it. Like a physical safe, but in your browser.' },
-    { n: '04', title: 'Share just what you choose', body: 'Give one teammate access to one secret. Take it back any time. Nothing more leaks.' },
+    {
+        number: '01',
+        title: 'Create a workspace',
+        body: 'Bring the right people and projects together in one shared space.',
+    },
+    {
+        number: '02',
+        title: 'Add your credentials',
+        body: 'Keep the keys and account details your team relies on organized.',
+    },
+    {
+        number: '03',
+        title: 'Share only what is needed',
+        body: 'Manage membership and credential access as your team changes.',
+    },
 ];
-function LPSteps() {
-    return (_jsxs("section", { id: "steps", className: "lp-steps", "aria-label": "How it works", children: [_jsx("div", { className: "lp-steps__bg", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-steps__inner", children: [_jsxs("div", { className: "lp-section-hd reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "Simple by design" }), _jsx("h2", { className: "lp-h2", children: "Ready in four steps" })] }), _jsx("ol", { className: "lp-steps__list", "aria-label": "Steps to get started", children: steps.map((s, i) => _jsx(StepCard, { s: s, delay: i * 100 }, s.n)) })] })] }));
-}
-function StepCard({ s, delay }) {
-    const ref = useRef(null);
-    const [vis, setVis] = useState(false);
+const workspaceLevels = [
+    {
+        icon: Users,
+        number: '01',
+        title: 'Workspace',
+        body: 'Bring the people and shared information for a team into one clear home.',
+    },
+    {
+        icon: FolderKanban,
+        number: '02',
+        title: 'Project',
+        body: 'Group related work together so credentials stay connected to their purpose.',
+    },
+    {
+        icon: KeyRound,
+        number: '03',
+        title: 'Credential',
+        body: 'Keep the account details your team uses organized and easier to find.',
+    },
+];
+export default function LandingPage() {
+    const [navSolid, setNavSolid] = useState(false);
     useEffect(() => {
-        const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) {
-            setVis(true);
-            obs.disconnect();
-        } }, { threshold: 0.2 });
-        if (ref.current)
-            obs.observe(ref.current);
-        return () => obs.disconnect();
+        document.documentElement.classList.add('lp-hide-scrollbar');
+        document.body.classList.add('lp-hide-scrollbar');
+        const revealElements = document.querySelectorAll('.lp-reveal');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('lp-reveal--visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.12 });
+        revealElements.forEach((element) => observer.observe(element));
+        let scrollFrame = 0;
+        const updateNavigation = () => {
+            if (scrollFrame)
+                return;
+            scrollFrame = window.requestAnimationFrame(() => {
+                scrollFrame = 0;
+                const scrollY = window.scrollY;
+                setNavSolid(scrollY > 16);
+            });
+        };
+        updateNavigation();
+        window.addEventListener('scroll', updateNavigation, { passive: true });
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('scroll', updateNavigation);
+            if (scrollFrame)
+                window.cancelAnimationFrame(scrollFrame);
+            document.documentElement.classList.remove('lp-hide-scrollbar');
+            document.body.classList.remove('lp-hide-scrollbar');
+        };
     }, []);
-    return (_jsxs("li", { ref: ref, className: `lp-step ${vis ? 'lp-step--vis' : ''}`, style: { transitionDelay: `${delay}ms` }, children: [_jsx("span", { className: "lp-step__n", "aria-hidden": "true", children: s.n }), _jsx("strong", { className: "lp-step__title", children: s.title }), _jsx("p", { className: "lp-step__body", children: s.body })] }));
-}
-function LPQuote() {
-    return (_jsx("section", { className: "lp-quote", "aria-label": "Customer quote", children: _jsxs("div", { className: "lp-wrap lp-quote__inner reveal", children: [_jsx("blockquote", { className: "lp-quote__text", children: "\"We spent years sharing credentials over Slack and hoping nothing leaked. Vaultnary fixed that in an afternoon.\"" }), _jsx("cite", { className: "lp-quote__attr", children: "Head of Engineering, a 40-person product team" })] }) }));
-}
-function LPCta() {
-    return (_jsxs("section", { className: "lp-cta", "aria-label": "Get started", children: [_jsx("div", { className: "lp-cta__bg", "aria-hidden": "true" }), _jsx("div", { className: "lp-cta__scrim", "aria-hidden": "true" }), _jsxs("div", { className: "lp-wrap lp-cta__inner reveal", children: [_jsxs("h2", { className: "lp-cta__h2", children: ["Stop sharing passwords.", _jsx("br", {}), "Start sharing access."] }), _jsx("p", { className: "lp-cta__sub", children: "Free to start. No credit card. Works immediately." }), _jsxs(Link, { to: "/register", className: "lp-btn-primary lp-btn-primary--lg", children: ["Create your free vault ", _jsx(ArrowRight, { size: 16, strokeWidth: 2.5, "aria-hidden": "true" })] })] })] }));
-}
-function LPFooter() {
-    const [imgFailed, setImgFailed] = useState(false);
-    const logoUrl = new URL('../../assets/logo.png', import.meta.url).href;
-    return (_jsx("footer", { className: "lp-footer", role: "contentinfo", children: _jsxs("div", { className: "lp-wrap", children: [_jsxs("div", { className: "lp-footer__row", children: [_jsx("span", { className: "lp-footer__brand", children: imgFailed ? (_jsxs(_Fragment, { children: [_jsx(Lock, { size: 15, strokeWidth: 2, "aria-hidden": "true" }), " Vaultnary"] })) : (_jsx("img", { src: logoUrl, alt: "Vaultnary", onError: () => setImgFailed(true), style: { height: '1.5rem', width: 'auto', objectFit: 'contain' } })) }), _jsx("p", { className: "lp-footer__copy", children: "Your credentials, always under your control." }), _jsxs("nav", { "aria-label": "Footer links", className: "lp-footer__links", children: [_jsx(Link, { to: "/register", children: "Get started" }), _jsx(Link, { to: "/login", children: "Sign in" })] })] }), _jsxs("div", { className: "lp-footer__bottom", children: [_jsxs("p", { className: "lp-footer__legal", children: ["\u00A9 ", new Date().getFullYear(), " Naren S J. All rights reserved. Proprietary software \u2014 not open source."] }), _jsx("p", { className: "lp-footer__legal", children: "narensonu1520@gmail.com" })] })] }) }));
+    return (_jsxs("div", { className: "lp", children: [_jsx("header", { className: `lp-nav ${navSolid ? 'lp-nav--solid' : ''}`, children: _jsxs("div", { className: "lp-container lp-nav__inner", children: [_jsxs(Link, { to: "/", className: "lp-brand", "aria-label": "Vaultnary home", children: [_jsx("img", { src: logoUrl, alt: "Vaultnary" }), _jsx("span", { "aria-hidden": "true", children: "Vaultnary" })] }), _jsxs("div", { className: "lp-nav__actions", children: [_jsx(Link, { to: "/login", className: "lp-nav__login", children: "Log in" }), _jsxs(Link, { to: "/register", className: "lp-button lp-button--small", children: ["Get started ", _jsx(ArrowRight, { size: 15 })] })] })] }) }), _jsxs("main", { children: [_jsxs("div", { className: "lp-opening", children: [_jsx(VantaTopology, {}), _jsxs("section", { className: "lp-hero", children: [_jsxs("div", { className: "lp-container lp-hero__inner", children: [_jsxs("div", { className: "lp-hero__copy", children: [_jsxs("p", { className: "lp-kicker", children: [_jsx("span", {}), " A better home for team credentials"] }), _jsxs("h1", { children: ["Keep your team\u2019s keys ", _jsx("span", { children: "in good hands." })] }), _jsx("p", { className: "lp-hero__description", children: "Vaultnary brings credentials, people, and projects together-so your team can share access with clarity and confidence." }), _jsxs("div", { className: "lp-hero__actions", children: [_jsxs(Link, { to: "/register", className: "lp-button", children: ["Create your workspace ", _jsx(ArrowRight, { size: 17 })] }), _jsxs("a", { href: "#product", className: "lp-text-link", children: ["Explore the product ", _jsx(ChevronRight, { size: 16 })] })] }), _jsxs("div", { className: "lp-hero__note", children: [_jsx(ShieldCheck, { size: 17 }), _jsx("span", { children: "Organized access. Clear ownership. One secure workspace." })] })] }), _jsx(WorkspacePreview, {})] }), _jsxs("a", { className: "lp-scroll-cue", href: "#product", children: [_jsx(ArrowDown, { size: 14 }), " Scroll to explore"] })] }), _jsx("section", { className: "lp-principles", "aria-label": "Product principles", children: _jsxs("div", { className: "lp-container lp-principles__inner", children: [_jsx("span", { children: "Built around the way teams work" }), _jsxs("div", { children: [_jsx(LockKeyhole, { size: 16 }), " Private vault"] }), _jsxs("div", { children: [_jsx(Users, { size: 16 }), " Team workspaces"] }), _jsxs("div", { children: [_jsx(Clock3, { size: 16 }), " Activity history"] })] }) }), _jsx("section", { id: "product", className: "lp-section lp-product lp-opening-product", children: _jsxs("div", { className: "lp-container lp-opening-product__layout", children: [_jsx("div", { className: "lp-opening-product__device", children: _jsxs("div", { className: "lp-opening-product__sticky", children: [_jsx("p", { className: "lp-device-showcase__eyebrow", children: "A better view of your workspace" }), _jsx(LaptopCard, {})] }) }), _jsxs("div", { className: "lp-opening-product__content", children: [_jsxs("div", { className: "lp-section-heading lp-opening-product__heading lp-reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "One connected workspace" }), _jsxs("h2", { children: ["Less scattered access.", _jsx("br", {}), _jsx("span", { children: "More intentional teamwork." })] }), _jsx("p", { children: "Give every credential a place, every teammate a role, and every project the context it needs." })] }), _jsx("div", { className: "lp-feature-grid", children: features.map(({ icon: Icon, title, body, detail }, index) => (_jsxs("article", { className: "lp-feature-card lp-reveal lp-reveal--zoom", children: [_jsx("span", { className: "lp-feature-card__icon", children: _jsx(Icon, { size: 20, strokeWidth: 1.8 }) }), _jsxs("span", { className: "lp-feature-card__number", children: ["0", index + 1] }), _jsx("h3", { children: title }), _jsx("p", { children: body }), _jsxs("span", { className: "lp-feature-card__detail", children: [_jsx(Check, { size: 14 }), " ", detail] })] }, title))) })] })] }) })] }), _jsx("section", { id: "workspaces", className: "lp-section lp-structure", children: _jsxs("div", { className: "lp-container", children: [_jsxs("div", { className: "lp-section-heading lp-structure__heading lp-reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "A place for every part of the work" }), _jsxs("h2", { children: ["Everything has a home.", _jsx("br", {}), _jsx("span", { children: "Nothing feels out of context." })] }), _jsx("p", { children: "Move from the bigger picture to the details your team needs, with a simple structure that keeps related work together." })] }), _jsx("div", { className: "lp-structure__grid", children: workspaceLevels.map(({ icon: Icon, number, title, body }) => (_jsxs("article", { className: "lp-structure-card lp-reveal lp-reveal--from-side", children: [_jsxs("div", { className: "lp-structure-card__top", children: [_jsx("span", { className: "lp-structure-card__icon", children: _jsx(Icon, { size: 20, strokeWidth: 1.8 }) }), _jsx("span", { children: number })] }), _jsx("p", { className: "lp-structure-card__label", children: "YOUR VAULTNARY STRUCTURE" }), _jsx("h3", { children: title }), _jsx("p", { className: "lp-structure-card__body", children: body })] }, title))) })] }) }), _jsx("section", { id: "how-it-works", className: "lp-section lp-workflow", children: _jsxs("div", { className: "lp-container lp-workflow__layout", children: [_jsxs("div", { className: "lp-workflow__intro lp-reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "A clear path from day one" }), _jsx("h2", { children: "Good security should fit into the work you already do." }), _jsx("p", { children: "Start with a workspace, build a useful structure, and invite the people who need access. No shared spreadsheets or mystery accounts." }), _jsxs(Link, { to: "/register", className: "lp-text-link", children: ["Set up your workspace ", _jsx(ArrowRight, { size: 16 })] })] }), _jsx("ol", { className: "lp-steps", children: steps.map((step) => (_jsxs("li", { className: "lp-step lp-reveal", children: [_jsx("span", { className: "lp-step__number", children: step.number }), _jsxs("div", { children: [_jsx("h3", { children: step.title }), _jsx("p", { children: step.body })] }), _jsx(ChevronRight, { size: 18, className: "lp-step__arrow" })] }, step.number))) })] }) }), _jsx("section", { id: "security", className: "lp-security", children: _jsxs("div", { className: "lp-container lp-security__inner", children: [_jsxs("div", { className: "lp-security__visual lp-reveal lp-reveal--zoom", "aria-hidden": "true", children: [_jsx("div", { className: "lp-security__halo", children: _jsx(Fingerprint, { size: 54, strokeWidth: 1.2 }) }), _jsx("span", { className: "lp-security__orbit lp-security__orbit--one" }), _jsx("span", { className: "lp-security__orbit lp-security__orbit--two" }), _jsxs("span", { className: "lp-security__badge", children: [_jsx(ShieldCheck, { size: 17 }), " Control stays with you"] })] }), _jsxs("div", { className: "lp-security__copy lp-reveal", children: [_jsx("p", { className: "lp-eyebrow", children: "Security with clarity" }), _jsx("h2", { children: "Your credentials are important. Their access should be deliberate." }), _jsx("p", { children: "Keep your team\u2019s sensitive information organized, share it with the right people, and review activity from one place." }), _jsxs("ul", { children: [_jsxs("li", { children: [_jsx(Check, { size: 16 }), " Workspace roles and member management"] }), _jsxs("li", { children: [_jsx(Check, { size: 16 }), " Credential sharing with access controls"] }), _jsxs("li", { children: [_jsx(Check, { size: 16 }), " Audit and security activity views"] })] }), _jsxs(Link, { to: "/register", className: "lp-text-link", children: ["Take a closer look ", _jsx(ArrowRight, { size: 16 })] })] })] }) }), _jsx("section", { className: "lp-final-cta", children: _jsxs("div", { className: "lp-container lp-final-cta__inner lp-reveal", children: [_jsxs("div", { children: [_jsx("p", { className: "lp-eyebrow", children: "Make access easier to manage" }), _jsx("h2", { children: "Give your team a better way to work with secrets." }), _jsx("p", { children: "Start organizing credentials and team access in Vaultnary." })] }), _jsxs(Link, { to: "/register", className: "lp-button lp-button--light", children: ["Get started ", _jsx(ArrowRight, { size: 17 })] })] }) })] }), _jsx("footer", { className: "lp-footer", children: _jsxs("div", { className: "lp-container", children: [_jsxs("div", { className: "lp-footer__top", children: [_jsxs("div", { className: "lp-footer__brand-block", children: [_jsx(Link, { to: "/", className: "lp-brand", "aria-label": "Vaultnary home", children: _jsx("img", { src: logoUrl, alt: "Vaultnary" }) }), _jsx("p", { children: "A thoughtful home for the credentials, projects, and people your team relies on." })] }), _jsxs("nav", { className: "lp-footer__column", "aria-label": "Explore Vaultnary", children: [_jsx("h2", { children: "Explore" }), _jsx("a", { href: "#product", children: "Product" }), _jsx("a", { href: "#workspaces", children: "Workspaces" }), _jsx("a", { href: "#how-it-works", children: "How it works" }), _jsx("a", { href: "#security", children: "Security" })] }), _jsxs("nav", { className: "lp-footer__column", "aria-label": "Your account", children: [_jsx("h2", { children: "Account" }), _jsx(Link, { to: "/login", children: "Log in" }), _jsx(Link, { to: "/register", children: "Create an account" })] }), _jsxs("nav", { className: "lp-footer__column", "aria-label": "Legal and security information", children: [_jsx("h2", { children: "Information" }), _jsx(Link, { to: "/security", children: "Security" }), _jsx(Link, { to: "/privacy", children: "Privacy" }), _jsx(Link, { to: "/terms", children: "Terms" }), _jsx("a", { href: "mailto:narensonu1520@gmail.com", children: "Contact" })] })] }), _jsxs("div", { className: "lp-footer__bottom", children: [_jsxs("span", { children: ["\u00A9 ", new Date().getFullYear(), " Vaultnary"] }), _jsx("span", { children: "Keep team access clear and in context." }), _jsxs(Link, { to: "/register", children: ["Create your workspace ", _jsx(ArrowRight, { size: 14 })] })] })] }) })] }));
 }

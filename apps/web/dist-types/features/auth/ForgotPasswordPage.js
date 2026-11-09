@@ -1,8 +1,11 @@
-import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Check, Mail } from 'lucide-react';
 import { apiPost } from '../../services/http-client';
 import { isValidEmail } from '../../services/validation';
+import AuthPageLayout from './AuthPageLayout';
+import './auth.css';
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
@@ -27,15 +30,5 @@ export default function ForgotPasswordPage() {
             setSubmitted(true);
         }
     }
-    return (_jsx("div", { style: pageStyle, children: _jsxs("div", { style: cardStyle, children: [_jsx("h1", { style: headingStyle, children: "Reset password" }), submitted ? (_jsxs(_Fragment, { children: [_jsx("p", { style: mutedStyle, children: "If an account exists for that address, a reset link has been sent." }), _jsx(Link, { to: "/login", style: linkStyle, children: "Back to sign in" })] })) : (_jsxs("form", { onSubmit: handleSubmit, noValidate: true, style: { display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }, children: [_jsxs("div", { style: fieldGroup, children: [_jsx("label", { htmlFor: "email", style: labelStyle, children: "Email" }), _jsx("input", { id: "email", type: "email", autoComplete: "email", value: email, onChange: (e) => setEmail(e.target.value), "aria-describedby": emailError ? 'email-error' : undefined, "aria-invalid": !!emailError, style: inputStyle, disabled: loading }), emailError && _jsx("span", { id: "email-error", role: "alert", style: fieldErrorStyle, children: emailError })] }), _jsx("button", { type: "submit", disabled: loading, style: submitStyle, children: loading ? 'Sending…' : 'Send reset link' }), _jsx(Link, { to: "/login", style: { ...linkStyle, textAlign: 'center' }, children: "Back to sign in" })] }))] }) }));
+    return (_jsx(AuthPageLayout, { children: submitted ? (_jsxs("div", { className: "auth-login__form", "aria-labelledby": "reset-sent-title", children: [_jsx("div", { className: "auth-login__status-icon", children: _jsx(Check, { size: 23 }) }), _jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "CHECK YOUR INBOX" }), _jsx("h2", { id: "reset-sent-title", children: "If there\u2019s an account, you\u2019ll hear from us" }), _jsx("p", { children: "If an account exists for that address, a reset link has been sent." })] }), _jsxs(Link, { to: "/login", className: "auth-login__text-link", children: [_jsx(ArrowLeft, { size: 14 }), " Back to sign in"] })] })) : (_jsxs("form", { onSubmit: handleSubmit, noValidate: true, "aria-label": "Reset password", className: "auth-login__form", children: [_jsxs("div", { className: "auth-login__form-heading", children: [_jsx("span", { className: "auth-login__form-kicker", children: "ACCOUNT RECOVERY" }), _jsx("h2", { children: "Reset password" }), _jsx("p", { children: "Enter your account email and we\u2019ll send a secure reset link if it\u2019s registered." })] }), _jsxs("div", { className: "auth-login__field", children: [_jsx("label", { htmlFor: "email", children: "Email address" }), _jsxs("div", { className: "auth-login__input-with-icon", children: [_jsx(Mail, { size: 16, "aria-hidden": "true" }), _jsx("input", { id: "email", type: "email", autoComplete: "email", placeholder: "you@company.com", value: email, onChange: (e) => setEmail(e.target.value), "aria-describedby": emailError ? 'email-error' : undefined, "aria-invalid": !!emailError, disabled: loading })] }), emailError && _jsx("span", { id: "email-error", role: "alert", className: "auth-login__field-error", children: emailError })] }), _jsxs("button", { type: "submit", disabled: loading, className: "auth-login__submit", children: [_jsx("span", { children: loading ? 'Sending…' : 'Send reset link' }), _jsx(ArrowRight, { size: 17, "aria-hidden": "true" })] }), _jsxs(Link, { to: "/login", className: "auth-login__text-link", children: [_jsx(ArrowLeft, { size: 14 }), " Back to sign in"] })] })) }));
 }
-const pageStyle = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-subtle)', padding: 'var(--space-4)' };
-const cardStyle = { width: '100%', maxWidth: '24rem', backgroundColor: 'var(--color-bg)', border: 'var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' };
-const headingStyle = { fontSize: 'var(--text-xl)', fontWeight: 'var(--font-weight-semibold)', textAlign: 'center' };
-const mutedStyle = { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' };
-const linkStyle = { color: 'var(--color-accent)', fontSize: 'var(--text-sm)' };
-const fieldGroup = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
-const labelStyle = { fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' };
-const inputStyle = { padding: 'var(--space-2) var(--space-3)', border: 'var(--border-input)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', width: '100%' };
-const submitStyle = { padding: 'var(--space-2) var(--space-4)', backgroundColor: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--text-base)', cursor: 'pointer', width: '100%' };
-const fieldErrorStyle = { fontSize: 'var(--text-xs)', color: 'var(--color-danger)' };

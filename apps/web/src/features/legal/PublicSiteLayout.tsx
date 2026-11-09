@@ -25,11 +25,6 @@ export default function PublicSiteLayout({ children }: { children: React.ReactNo
           <Link to="/" className="public-brand" aria-label="Vaultnary home">
             <img src={logoUrl} alt="Vaultnary" />
           </Link>
-          <nav className="public-header__nav" aria-label="Main navigation">
-            <Link to="/#product">Product</Link>
-            <Link to="/#workspaces">Workspaces</Link>
-            <Link to="/security">Security</Link>
-          </nav>
           <div className="public-header__actions">
             <Link to="/login" className="public-header__login">Log in</Link>
             <Link to="/register" className="public-button public-button--small">
