@@ -1,0 +1,19 @@
+.lp-vanta-topology {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  background: #03020b;
+}
+
+.lp-vanta-topology canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-vanta-topology {
+    display: none;
+  }
+}

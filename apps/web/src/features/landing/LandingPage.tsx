@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import logoUrl from '../../assets/logo.png'
 import LaptopCard from './components/LaptopCard'
+import VantaTopology from './components/VantaTopology'
 import './landing.css'
 
 const features = [
@@ -157,76 +158,80 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="lp-hero">
-          <div className="lp-container lp-hero__inner">
-            <div className="lp-hero__copy">
-              <p className="lp-kicker"><span /> A better home for team credentials</p>
-              <h1>Keep your team’s keys <span>in good hands.</span></h1>
-              <p className="lp-hero__description">
-                Vaultnary brings credentials, people, and projects together—so your team
-                can share access with clarity and confidence.
-              </p>
-              <div className="lp-hero__actions">
-                <Link to="/register" className="lp-button">
-                  Create your workspace <ArrowRight size={17} />
-                </Link>
-                <a href="#product" className="lp-text-link">
-                  Explore the product <ChevronRight size={16} />
-                </a>
+        <div className="lp-opening">
+          <VantaTopology />
+          <section className="lp-hero">
+            <div className="lp-container lp-hero__inner">
+              <div className="lp-hero__copy">
+                <p className="lp-kicker"><span /> A better home for team credentials</p>
+                <h1>Keep your team’s keys <span>in good hands.</span></h1>
+                <p className="lp-hero__description">
+                  Vaultnary brings credentials, people, and projects together—so your team
+                  can share access with clarity and confidence.
+                </p>
+                <div className="lp-hero__actions">
+                  <Link to="/register" className="lp-button">
+                    Create your workspace <ArrowRight size={17} />
+                  </Link>
+                  <a href="#product" className="lp-text-link">
+                    Explore the product <ChevronRight size={16} />
+                  </a>
+                </div>
+                <div className="lp-hero__note">
+                  <ShieldCheck size={17} />
+                  <span>Organized access. Clear ownership. One secure workspace.</span>
+                </div>
               </div>
-              <div className="lp-hero__note">
-                <ShieldCheck size={17} />
-                <span>Organized access. Clear ownership. One secure workspace.</span>
+
+              <ProductPreview />
+            </div>
+            <a className="lp-scroll-cue" href="#product">
+              <ArrowDown size={14} /> Scroll to explore
+            </a>
+          </section>
+
+          <section className="lp-principles" aria-label="Product principles">
+            <div className="lp-container lp-principles__inner">
+              <span>Built around the way teams work</span>
+              <div><LockKeyhole size={16} /> Private vault</div>
+              <div><Users size={16} /> Team workspaces</div>
+              <div><Clock3 size={16} /> Activity history</div>
+            </div>
+          </section>
+
+          <section id="product" className="lp-section lp-product lp-opening-product">
+            <div className="lp-container lp-opening-product__layout">
+              <div className="lp-opening-product__device">
+                <div className="lp-opening-product__sticky">
+                  <p className="lp-device-showcase__eyebrow">A better view of your workspace</p>
+                  <LaptopCard />
+                </div>
+              </div>
+              <div className="lp-opening-product__content">
+                <div className="lp-section-heading lp-opening-product__heading lp-reveal">
+                  <p className="lp-eyebrow">One connected workspace</p>
+                  <h2>Less scattered access.<br /><span>More intentional teamwork.</span></h2>
+                  <p>
+                    Give every credential a place, every teammate a role, and every project
+                    the context it needs.
+                  </p>
+                </div>
+
+                <div className="lp-feature-grid">
+                  {features.map(({ icon: Icon, title, body, detail }, index) => (
+                    <article className="lp-feature-card lp-reveal lp-reveal--zoom" key={title}>
+                      <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
+                      <span className="lp-feature-card__number">0{index + 1}</span>
+                      <h3>{title}</h3>
+                      <p>{body}</p>
+                      <span className="lp-feature-card__detail"><Check size={14} /> {detail}</span>
+                    </article>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <ProductPreview />
-          </div>
-          <a className="lp-scroll-cue" href="#product">
-            <ArrowDown size={14} /> Scroll to explore
-          </a>
-        </section>
-
-        <section className="lp-principles" aria-label="Product principles">
-          <div className="lp-container lp-principles__inner">
-            <span>Built around the way teams work</span>
-            <div><LockKeyhole size={16} /> Private vault</div>
-            <div><Users size={16} /> Team workspaces</div>
-            <div><Clock3 size={16} /> Activity history</div>
-          </div>
-        </section>
-
-        <section className="lp-device-showcase" aria-label="Vaultnary workspace on a laptop">
-          <div className="lp-container">
-            <p className="lp-device-showcase__eyebrow">A better view of your workspace</p>
-            <LaptopCard />
-          </div>
-        </section>
-
-        <section id="product" className="lp-section lp-product">
-          <div className="lp-container">
-            <div className="lp-section-heading lp-reveal">
-              <p className="lp-eyebrow">One connected workspace</p>
-              <h2>Less scattered access.<br /><span>More intentional teamwork.</span></h2>
-              <p>
-                Give every credential a place, every teammate a role, and every project
-                the context it needs.
-              </p>
-            </div>
-
-            <div className="lp-feature-grid">
-              {features.map(({ icon: Icon, title, body, detail }, index) => (
-                <article className="lp-feature-card lp-reveal lp-reveal--zoom" key={title}>
-                  <span className="lp-feature-card__icon"><Icon size={20} strokeWidth={1.8} /></span>
-                  <span className="lp-feature-card__number">0{index + 1}</span>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                  <span className="lp-feature-card__detail"><Check size={14} /> {detail}</span>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section id="workspaces" className="lp-section lp-structure">
           <div className="lp-container">
