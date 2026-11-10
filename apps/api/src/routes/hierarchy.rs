@@ -6,11 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 /* GET /api/v1/vault/items/:item_id/children */
@@ -130,13 +126,12 @@ pub async fn get_tree(
 
     let mut items: Vec<TreeItem> = Vec::with_capacity(rows.len());
     for (id, name, ctype, parent_id, d) in rows {
-        let (has_children,): (bool,) = sqlx::query_as(
-            "SELECT EXISTS(SELECT 1 FROM vault_items WHERE parent_item_id = $1)",
-        )
-        .bind(id)
-        .fetch_one(db)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+        let (has_children,): (bool,) =
+            sqlx::query_as("SELECT EXISTS(SELECT 1 FROM vault_items WHERE parent_item_id = $1)")
+                .bind(id)
+                .fetch_one(db)
+                .await
+                .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
         items.push(TreeItem {
             id,

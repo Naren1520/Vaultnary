@@ -27,7 +27,10 @@ pub struct ApiError {
 
 impl ApiError {
     pub fn new(inner: AppError) -> Self {
-        Self { inner, details: vec![] }
+        Self {
+            inner,
+            details: vec![],
+        }
     }
 
     pub fn with_details(inner: AppError, details: Vec<ErrorDetail>) -> Self {
@@ -58,16 +61,20 @@ impl IntoResponse for ApiError {
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "Request payload is too large.".to_string(),
             ),
-            AppError::Internal(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                {
-                    tracing::error!("Internal error: {:?}", e);
-                    "An unexpected error occurred.".to_string()
-                },
-            ),
+            AppError::Internal(e) => (StatusCode::INTERNAL_SERVER_ERROR, {
+                tracing::error!("Internal error: {:?}", e);
+                "An unexpected error occurred.".to_string()
+            }),
         };
 
-        (status, Json(ErrorBody { error: message, details: self.details })).into_response()
+        (
+            status,
+            Json(ErrorBody {
+                error: message,
+                details: self.details,
+            }),
+        )
+            .into_response()
     }
 }
 
@@ -75,6 +82,9 @@ impl IntoResponse for ApiError {
 pub fn unprocessable(field: &str, rule: &str) -> ApiError {
     ApiError::with_details(
         AppError::UnprocessableEntity(format!("{field}: {rule}")),
-        vec![ErrorDetail { field: field.to_string(), rule: rule.to_string() }],
+        vec![ErrorDetail {
+            field: field.to_string(),
+            rule: rule.to_string(),
+        }],
     )
 }

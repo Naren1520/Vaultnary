@@ -27,29 +27,50 @@ const VALID_ENVIRONMENTS: &[&str] = &["development", "staging", "production", "c
 fn validate_service_fields(
     body: &serde_json::Value,
 ) -> Result<(String, Option<String>, String, Option<Uuid>), ApiError> {
-    let name = body.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let name = body
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     if name.is_empty() || name.len() > MAX_NAME_LEN {
         return Err(ApiError::with_details(
             AppError::UnprocessableEntity("name: must be 1-100 chars".into()),
-            vec![ErrorDetail { field: "name".into(), rule: "length_1_100".into() }],
+            vec![ErrorDetail {
+                field: "name".into(),
+                rule: "length_1_100".into(),
+            }],
         ));
     }
-    let description = body.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let description = body
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     if let Some(ref d) = description {
         if d.len() > MAX_DESC_LEN {
             return Err(ApiError::with_details(
                 AppError::UnprocessableEntity("description: max 500 chars".into()),
-                vec![ErrorDetail { field: "description".into(), rule: "max_500".into() }],
+                vec![ErrorDetail {
+                    field: "description".into(),
+                    rule: "max_500".into(),
+                }],
             ));
         }
     }
-    let environment = body.get("environment").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let environment = body
+        .get("environment")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     if !VALID_ENVIRONMENTS.contains(&environment.as_str()) {
         return Err(ApiError::with_details(
             AppError::UnprocessableEntity(
                 "environment: must be development, staging, production, or custom".into(),
             ),
-            vec![ErrorDetail { field: "environment".into(), rule: "invalid_enum".into() }],
+            vec![ErrorDetail {
+                field: "environment".into(),
+                rule: "invalid_enum".into(),
+            }],
         ));
     }
     let project_id = match body.get("project_id") {
@@ -151,7 +172,8 @@ pub async fn create_service(
             id, workspace_id, name, description, environment, project_id,
             created_at: now.to_string(),
         }})),
-    ).into_response())
+    )
+        .into_response())
 }
 
 /* GET /api/v1/services */
@@ -160,7 +182,15 @@ pub async fn list_services(
     Extension(auth): Extension<AuthUser>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
+    type Row = (
+        Uuid,
+        Uuid,
+        String,
+        Option<String>,
+        String,
+        Option<Uuid>,
+        OffsetDateTime,
+    );
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT s.id, s.workspace_id, s.name, s.description, s.environment, s.project_id, s.created_at
          FROM services s
@@ -183,9 +213,18 @@ pub async fn list_services(
         project_id: Option<Uuid>,
         created_at: String,
     }
-    let items: Vec<ServiceItem> = rows.into_iter().map(|(id, workspace_id, name, desc, env, pid, ca)| ServiceItem {
-        id, workspace_id, name, description: desc, environment: env, project_id: pid, created_at: ca.to_string(),
-    }).collect();
+    let items: Vec<ServiceItem> = rows
+        .into_iter()
+        .map(|(id, workspace_id, name, desc, env, pid, ca)| ServiceItem {
+            id,
+            workspace_id,
+            name,
+            description: desc,
+            environment: env,
+            project_id: pid,
+            created_at: ca.to_string(),
+        })
+        .collect();
     Ok(Json(serde_json::json!({ "data": items })))
 }
 
@@ -196,7 +235,15 @@ pub async fn get_service(
     Path(service_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    type Row = (Uuid, Uuid, String, Option<String>, String, Option<Uuid>, OffsetDateTime);
+    type Row = (
+        Uuid,
+        Uuid,
+        String,
+        Option<String>,
+        String,
+        Option<Uuid>,
+        OffsetDateTime,
+    );
     let row: Option<Row> = sqlx::query_as(
         "SELECT s.id, s.workspace_id, s.name, s.description, s.environment, s.project_id, s.created_at
          FROM services s
@@ -249,13 +296,12 @@ pub async fn update_service(
     require_workspace_editor(db, workspace_id, auth.user_id).await?;
 
     if let Some(pid) = project_id {
-        let project_workspace: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT workspace_id FROM projects WHERE id = $1",
-        )
-        .bind(pid)
-        .fetch_optional(db)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+        let project_workspace: Option<(Uuid,)> =
+            sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
+                .bind(pid)
+                .fetch_optional(db)
+                .await
+                .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
         if project_workspace.map(|(project_workspace,)| project_workspace) != Some(workspace_id) {
             return Err(ApiError::new(AppError::NotFound));
         }
@@ -288,13 +334,12 @@ pub async fn delete_service(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT workspace_id FROM services WHERE id = $1",
-    )
-    .bind(service_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM services WHERE id = $1")
+            .bind(service_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let workspace_id = workspace_id
         .map(|(workspace_id,)| workspace_id)
@@ -304,7 +349,10 @@ pub async fn delete_service(
         return Err(ApiError::new(AppError::Forbidden));
     }
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     sqlx::query("DELETE FROM credential_usage WHERE service_id = $1")
         .bind(service_id)
         .execute(&mut *tx)
@@ -315,7 +363,9 @@ pub async fn delete_service(
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     Ok(StatusCode::OK.into_response())
 }
@@ -328,13 +378,12 @@ pub async fn service_credentials(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT workspace_id FROM services WHERE id = $1",
-    )
-    .bind(service_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM services WHERE id = $1")
+            .bind(service_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let workspace_id = workspace_id
         .map(|(workspace_id,)| workspace_id)
@@ -358,8 +407,19 @@ pub async fn service_credentials(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct CredItem { id: Uuid, name: String, credential_type: String }
-    let items: Vec<CredItem> = rows.into_iter().map(|(id, name, ct)| CredItem { id, name, credential_type: ct }).collect();
+    struct CredItem {
+        id: Uuid,
+        name: String,
+        credential_type: String,
+    }
+    let items: Vec<CredItem> = rows
+        .into_iter()
+        .map(|(id, name, ct)| CredItem {
+            id,
+            name,
+            credential_type: ct,
+        })
+        .collect();
     Ok(Json(serde_json::json!({ "data": items })))
 }
 
@@ -382,8 +442,7 @@ mod tests {
             "environment": "production",
             "project_id": null
         });
-        let (name, description, environment, project_id) =
-            validate_service_fields(&body).unwrap();
+        let (name, description, environment, project_id) = validate_service_fields(&body).unwrap();
         assert_eq!(name, "API");
         assert_eq!(description.as_deref(), Some("Internal API"));
         assert_eq!(environment, "production");

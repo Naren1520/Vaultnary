@@ -45,6 +45,12 @@ User types master password
              One row per user who has access to the item
 ```
 
+## Shared Credential Ownership Transfer
+
+When an account is deleted, the API preserves a credential that still has other authorized users only after the user selects a new owner. The browser, while the vault is unlocked, unwraps the current owner's encrypted DEK with their private key and wraps that DEK with the selected recipient's public key. It sends only the new RSA-OAEP envelope and the recipient key fingerprint to Rust.
+
+The API rechecks that the recipient is an eligible active collaborator and that the submitted key fingerprint is still current before atomically updating the permission and key-envelope rows. The DEK and credential plaintext are never sent to or processed by the server. If the recipient key changed or the browser cannot unwrap the existing DEK, the deletion request fails without removing the account or changing ownership.
+
 ---
 
 ## Algorithms Used

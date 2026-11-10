@@ -116,10 +116,13 @@ fn clear_session_cookie(secure: bool) -> HeaderValue {
 
 fn build_session_cookie(token: &str, secure: bool) -> String {
     let same_site = if secure { "None" } else { "Strict" };
-    let base = format!(
-        "vault_session={token}; Path=/; HttpOnly; SameSite={same_site}; Max-Age=2592000"
-    );
-    if secure { format!("{base}; Secure") } else { base }
+    let base =
+        format!("vault_session={token}; Path=/; HttpOnly; SameSite={same_site}; Max-Age=2592000");
+    if secure {
+        format!("{base}; Secure")
+    } else {
+        base
+    }
 }
 
 async fn insert_audit(
@@ -155,19 +158,32 @@ pub async fn register(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let email = body
+        .get("email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
     let password = body.get("password").and_then(|v| v.as_str()).unwrap_or("");
 
     if email.is_empty() || password.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("email and password are required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "email and password are required".into(),
+        )));
     }
 
     let mut details = vec![];
     if !validate_email(&email) {
-        details.push(ErrorDetail { field: "email".into(), rule: "format".into() });
+        details.push(ErrorDetail {
+            field: "email".into(),
+            rule: "format".into(),
+        });
     }
     if !validate_password(password) {
-        details.push(ErrorDetail { field: "password".into(), rule: "length_12_128".into() });
+        details.push(ErrorDetail {
+            field: "password".into(),
+            rule: "length_12_128".into(),
+        });
     }
     if !details.is_empty() {
         return Err(ApiError::with_details(
@@ -190,8 +206,7 @@ pub async fn register(
         return Ok(StatusCode::OK.into_response());
     }
 
-    let password_hash = hash_password(password)
-        .map_err(|e| ApiError::new(e))?;
+    let password_hash = hash_password(password).map_err(|e| ApiError::new(e))?;
 
     let user_id = Uuid::new_v4();
     let workspace_id = Uuid::new_v4();
@@ -201,7 +216,10 @@ pub async fn register(
     let expires_at = OffsetDateTime::now_utc() + time::Duration::hours(24);
 
     // Insert user + vault in single transaction
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query(
         "INSERT INTO users (id, email, password_hash, email_verify_token_hash, email_verify_token_expires_at, email_verified)
@@ -243,14 +261,25 @@ pub async fn register(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let ip = extract_ip(&headers).or_else(|| Some(addr.ip().to_string()));
-    insert_audit(db, user_id, "user.registered", None, None, ip, serde_json::json!({})).await;
+    insert_audit(
+        db,
+        user_id,
+        "user.registered",
+        None,
+        None,
+        ip,
+        serde_json::json!({}),
+    )
+    .await;
 
     // Send verification email via Resend (logs token if key not configured)
-    let frontend_url = std::env::var("FRONTEND_URL")
-        .unwrap_or_else(|_| "http://localhost:5173".to_string());
+    let frontend_url =
+        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
     crate::email::send_verification_email(&email, &verify_token, &frontend_url).await;
 
     Ok(StatusCode::OK.into_response())
@@ -263,7 +292,9 @@ pub async fn verify_email(
 ) -> Result<impl IntoResponse, ApiError> {
     let token = params.token.unwrap_or_default();
     if token.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("token is required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "token is required".into(),
+        )));
     }
 
     let token_hash = hash_token(&token);
@@ -279,16 +310,24 @@ pub async fn verify_email(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let (user_id, already_verified, expires_at) = match row {
-        None => return Err(ApiError::new(AppError::BadRequest("Invalid or expired verification token".into()))),
+        None => {
+            return Err(ApiError::new(AppError::BadRequest(
+                "Invalid or expired verification token".into(),
+            )))
+        }
         Some(r) => r,
     };
 
     if already_verified {
-        return Err(ApiError::new(AppError::BadRequest("Invalid or expired verification token".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "Invalid or expired verification token".into(),
+        )));
     }
 
     if expires_at.map(|e| e < now).unwrap_or(true) {
-        return Err(ApiError::new(AppError::BadRequest("Invalid or expired verification token".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "Invalid or expired verification token".into(),
+        )));
     }
 
     sqlx::query(
@@ -307,21 +346,27 @@ pub async fn resend_verification(
     State(state): State<AppState>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let email = body
+        .get("email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
 
     if email.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("email is required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "email is required".into(),
+        )));
     }
 
     let db = state.db();
 
-    let row: Option<(Uuid, bool)> = sqlx::query_as(
-        "SELECT id, email_verified FROM users WHERE email = $1",
-    )
-    .bind(&email)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let row: Option<(Uuid, bool)> =
+        sqlx::query_as("SELECT id, email_verified FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     // Always return 200 regardless of account existence
     if let Some((user_id, false)) = row {
@@ -340,8 +385,8 @@ pub async fn resend_verification(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
         tracing::info!(user_id = %user_id, "resend verification token generated");
-        let frontend_url = std::env::var("FRONTEND_URL")
-            .unwrap_or_else(|_| "http://localhost:5173".to_string());
+        let frontend_url =
+            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
         crate::email::send_verification_email(&email, &verify_token, &frontend_url).await;
     }
 
@@ -355,9 +400,15 @@ pub async fn login(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Response, ApiError> {
-    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let email = body
+        .get("email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
     let password = body.get("password").and_then(|v| v.as_str()).unwrap_or("");
-    let device_fingerprint = body.get("device_fingerprint")
+    let device_fingerprint = body
+        .get("device_fingerprint")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(|s| &s[..s.len().min(512)])
@@ -373,13 +424,12 @@ pub async fn login(
     let ip = extract_ip(&headers).or_else(|| Some(addr.ip().to_string()));
     let user_agent = extract_user_agent(&headers);
 
-    let row: Option<(Uuid, String, bool)> = sqlx::query_as(
-        "SELECT id, password_hash, email_verified FROM users WHERE email = $1",
-    )
-    .bind(&email)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let row: Option<(Uuid, String, bool)> =
+        sqlx::query_as("SELECT id, password_hash, email_verified FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let (user_id, stored_hash, email_verified) = match row {
         None => {
@@ -390,8 +440,7 @@ pub async fn login(
         Some(r) => r,
     };
 
-    let password_ok = verify_password(&stored_hash, password)
-        .map_err(|e| ApiError::new(e))?;
+    let password_ok = verify_password(&stored_hash, password).map_err(|e| ApiError::new(e))?;
 
     if !password_ok {
         return Err(ApiError::new(AppError::Unauthorized));
@@ -432,16 +481,16 @@ pub async fn login(
         None,
         ip.clone(),
         serde_json::json!({ "user_agent": user_agent }),
-    ).await;
+    )
+    .await;
 
     let secure = !state.config().is_development();
     let cookie = build_session_cookie(&session_token, secure);
 
     let mut response = Json(LoginResponse { csrf_token }).into_response();
-    response.headers_mut().insert(
-        header::SET_COOKIE,
-        HeaderValue::from_str(&cookie).unwrap(),
-    );
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
 
     Ok(response)
 }
@@ -460,7 +509,16 @@ pub async fn logout(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    insert_audit(db, auth.user_id, "user.logout", None, None, None, serde_json::json!({})).await;
+    insert_audit(
+        db,
+        auth.user_id,
+        "user.logout",
+        None,
+        None,
+        None,
+        serde_json::json!({}),
+    )
+    .await;
 
     let mut response = StatusCode::OK.into_response();
     response
@@ -490,15 +548,17 @@ pub async fn list_sessions(
 
     let sessions: Vec<SessionRecord> = rows
         .into_iter()
-        .map(|(id, created_at, last_used_at, expires_at, ip, ua, fp)| SessionRecord {
-            id,
-            created_at: created_at.to_string(),
-            last_used_at: last_used_at.map(|t| t.to_string()),
-            expires_at: expires_at.to_string(),
-            ip_address: ip,
-            user_agent: ua,
-            device_fingerprint: fp,
-        })
+        .map(
+            |(id, created_at, last_used_at, expires_at, ip, ua, fp)| SessionRecord {
+                id,
+                created_at: created_at.to_string(),
+                last_used_at: last_used_at.map(|t| t.to_string()),
+                expires_at: expires_at.to_string(),
+                ip_address: ip,
+                user_agent: ua,
+                device_fingerprint: fp,
+            },
+        )
         .collect();
 
     Ok(Json(serde_json::json!({ "data": sessions })))
@@ -512,17 +572,17 @@ pub async fn revoke_session(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let row: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT user_id FROM auth_sessions WHERE id = $1",
-    )
-    .bind(session_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let row: Option<(Uuid,)> = sqlx::query_as("SELECT user_id FROM auth_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_optional(db)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     match row {
         None => return Err(ApiError::new(AppError::NotFound)),
-        Some((owner_id,)) if owner_id != auth.user_id => return Err(ApiError::new(AppError::NotFound)),
+        Some((owner_id,)) if owner_id != auth.user_id => {
+            return Err(ApiError::new(AppError::NotFound))
+        }
         _ => {}
     }
 
@@ -540,7 +600,8 @@ pub async fn revoke_session(
         Some("session"),
         None,
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(StatusCode::OK.into_response())
 }
@@ -561,14 +622,12 @@ pub async fn revoke_all_sessions(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    sqlx::query(
-        "UPDATE auth_sessions SET revoked = true WHERE user_id = $1 AND id != $2",
-    )
-    .bind(auth.user_id)
-    .bind(auth.session_id)
-    .execute(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    sqlx::query("UPDATE auth_sessions SET revoked = true WHERE user_id = $1 AND id != $2")
+        .bind(auth.user_id)
+        .bind(auth.session_id)
+        .execute(db)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     for (revoked_id,) in rows {
         insert_audit(
@@ -579,7 +638,8 @@ pub async fn revoke_all_sessions(
             Some("session"),
             None,
             serde_json::json!({}),
-        ).await;
+        )
+        .await;
     }
 
     Ok(StatusCode::OK.into_response())
@@ -591,11 +651,19 @@ pub async fn change_password(
     auth: axum::Extension<AuthUser>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let current = body.get("current_password").and_then(|v| v.as_str()).unwrap_or("");
-    let new = body.get("new_password").and_then(|v| v.as_str()).unwrap_or("");
+    let current = body
+        .get("current_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let new = body
+        .get("new_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     if current.is_empty() || new.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("current_password and new_password are required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "current_password and new_password are required".into(),
+        )));
     }
 
     if !validate_password(new) {
@@ -614,12 +682,17 @@ pub async fn change_password(
 
     let ok = verify_password(&stored_hash, current).map_err(|e| ApiError::new(e))?;
     if !ok {
-        return Err(ApiError::new(AppError::BadRequest("Current password is incorrect".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "Current password is incorrect".into(),
+        )));
     }
 
     let new_hash = hash_password(new).map_err(|e| ApiError::new(e))?;
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
         .bind(&new_hash)
@@ -636,9 +709,20 @@ pub async fn change_password(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    insert_audit(db, auth.user_id, "user.password_changed", None, None, None, serde_json::json!({})).await;
+    insert_audit(
+        db,
+        auth.user_id,
+        "user.password_changed",
+        None,
+        None,
+        None,
+        serde_json::json!({}),
+    )
+    .await;
 
     Ok(StatusCode::OK.into_response())
 }
@@ -648,19 +732,27 @@ pub async fn forgot_password(
     State(state): State<AppState>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let email = body
+        .get("email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
 
     if email.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("email is required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "email is required".into(),
+        )));
     }
 
     let db = state.db();
 
-    let row: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE email = $1 AND email_verified = true")
-        .bind(&email)
-        .fetch_optional(db)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let row: Option<(Uuid,)> =
+        sqlx::query_as("SELECT id FROM users WHERE email = $1 AND email_verified = true")
+            .bind(&email)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     match row {
         Some((user_id,)) => {
@@ -698,10 +790,15 @@ pub async fn reset_password(
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
     let token = body.get("token").and_then(|v| v.as_str()).unwrap_or("");
-    let new_password = body.get("new_password").and_then(|v| v.as_str()).unwrap_or("");
+    let new_password = body
+        .get("new_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     if token.is_empty() || new_password.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("token and new_password are required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "token and new_password are required".into(),
+        )));
     }
 
     if !validate_password(new_password) {
@@ -721,17 +818,26 @@ pub async fn reset_password(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let (user_id, expires_at) = match row {
-        None => return Err(ApiError::new(AppError::BadRequest("Invalid or expired reset token".into()))),
+        None => {
+            return Err(ApiError::new(AppError::BadRequest(
+                "Invalid or expired reset token".into(),
+            )))
+        }
         Some(r) => r,
     };
 
     if expires_at.map(|e| e < now).unwrap_or(true) {
-        return Err(ApiError::new(AppError::BadRequest("Invalid or expired reset token".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "Invalid or expired reset token".into(),
+        )));
     }
 
     let new_hash = hash_password(new_password).map_err(|e| ApiError::new(e))?;
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query(
         "UPDATE users SET password_hash = $1, password_reset_token_hash = NULL, password_reset_token_expires_at = NULL, updated_at = NOW() WHERE id = $2",
@@ -748,9 +854,20 @@ pub async fn reset_password(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    insert_audit(db, user_id, "user.password_changed", None, None, None, serde_json::json!({})).await;
+    insert_audit(
+        db,
+        user_id,
+        "user.password_changed",
+        None,
+        None,
+        None,
+        serde_json::json!({}),
+    )
+    .await;
 
     Ok(StatusCode::OK.into_response())
 }

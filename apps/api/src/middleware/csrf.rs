@@ -142,12 +142,10 @@ mod tests {
         }
 
         fn call(&mut self, _req: Request<Body>) -> Self::Future {
-            std::future::ready(Ok(
-                axum::http::Response::builder()
-                    .status(200)
-                    .body(Body::empty())
-                    .unwrap(),
-            ))
+            std::future::ready(Ok(axum::http::Response::builder()
+                .status(200)
+                .body(Body::empty())
+                .unwrap()))
         }
     }
 
@@ -162,7 +160,11 @@ mod tests {
     #[tokio::test]
     async fn get_request_passes_without_csrf_token() {
         let svc = CsrfGuardLayer.layer(OkService);
-        let req = Request::builder().method("GET").uri("/").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
         let resp = svc.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), 200);
     }
@@ -170,7 +172,11 @@ mod tests {
     #[tokio::test]
     async fn post_without_auth_user_passes_through() {
         let svc = CsrfGuardLayer.layer(OkService);
-        let req = Request::builder().method("POST").uri("/").body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .method("POST")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
         let resp = svc.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), 200);
     }
@@ -195,7 +201,11 @@ mod tests {
     async fn missing_csrf_token_returns_403() {
         let auth_user = make_auth_user("some-token");
         let svc = CsrfGuardLayer.layer(OkService);
-        let mut req = Request::builder().method("POST").uri("/").body(Body::empty()).unwrap();
+        let mut req = Request::builder()
+            .method("POST")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
         req.extensions_mut().insert(auth_user);
         let resp = svc.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), 403);
@@ -228,7 +238,11 @@ mod tests {
                 .unwrap();
             req.extensions_mut().insert(auth_user);
             let resp = svc.oneshot(req).await.unwrap();
-            assert_eq!(resp.status(), 403, "expected 403 for {method} without CSRF token");
+            assert_eq!(
+                resp.status(),
+                403,
+                "expected 403 for {method} without CSRF token"
+            );
         }
     }
 }

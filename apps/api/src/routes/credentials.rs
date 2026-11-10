@@ -5,11 +5,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 /// GET /api/v1/vault/items/:item_id/key-envelope
@@ -33,8 +29,7 @@ pub async fn get_key_envelope(
 
     let (encrypted_payload, encrypted_dek) =
         envelope.ok_or_else(|| ApiError::new(AppError::NotFound))?;
-    let encrypted_payload =
-        encrypted_payload.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let encrypted_payload = encrypted_payload.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     Ok(Json(serde_json::json!({
         "data": {

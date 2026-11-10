@@ -26,6 +26,7 @@ const ServiceDetail = lazy(() => import('../features/services/ServiceDetail'))
 const SecurityCenterPage = lazy(() => import('../features/security-center/SecurityCenterPage'))
 const AuditLogPage = lazy(() => import('../features/audit/AuditLogPage'))
 const WorkspacesPage = lazy(() => import('../features/workspaces/WorkspacesPage'))
+const ProfilePage = lazy(() => import('../features/profile/ProfilePage'))
 
 function ProtectedRoute() {
   const csrfToken = useAuthStore((s) => s.csrfToken)
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
           { path: 'workspaces', element: wrap(WorkspacesPage) },
           { path: 'security', element: wrap(SecurityCenterPage) },
           { path: 'audit', element: wrap(AuditLogPage) },
+          { path: 'profile', element: wrap(ProfilePage) },
         ],
       },
     ],

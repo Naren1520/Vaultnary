@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { FolderKey, GitBranch, FolderOpen, Server, ShieldCheck, ScrollText, Users } from 'lucide-react'
+import { FolderKey, GitBranch, FolderOpen, Server, ShieldCheck, ScrollText, Users, CircleUserRound } from 'lucide-react'
 
 interface NavItem {
   label: string
@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { label: 'Workspaces', href: '/app/workspaces',  icon: <Users       size={16} aria-hidden="true" /> },
   { label: 'Security',   href: '/app/security',    icon: <ShieldCheck size={16} aria-hidden="true" /> },
   { label: 'Audit Log',  href: '/app/audit',       icon: <ScrollText  size={16} aria-hidden="true" /> },
+  { label: 'Profile',    href: '/app/profile',     icon: <CircleUserRound size={16} aria-hidden="true" /> },
 ]
 
 export default function Sidebar() {

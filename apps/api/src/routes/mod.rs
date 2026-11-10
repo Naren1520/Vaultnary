@@ -8,10 +8,11 @@ use std::time::Duration;
 use crate::middleware::rate_limit::{InMemoryStore, RateLimitConfig, RateLimitLayer};
 use crate::state::AppState;
 
+pub mod account_deletion;
 pub mod audit;
 pub mod auth;
-pub mod credentials;
 pub mod contact;
+pub mod credentials;
 pub mod hierarchy;
 pub mod projects;
 pub mod recovery;
@@ -25,8 +26,7 @@ pub mod workspaces;
 
 /// Build the complete API router nested under `/api/v1/`.
 pub fn api_router() -> Router<AppState> {
-    Router::new()
-        .nest("/api/v1", v1_routes())
+    Router::new().nest("/api/v1", v1_routes())
 }
 
 fn v1_routes() -> Router<AppState> {
@@ -58,14 +58,42 @@ fn v1_routes() -> Router<AppState> {
         // Recovery
         .route("/auth/recover", post(recovery::recover))
         // --- Users ---
-        .route("/users/me", get(users::get_me))
+        .route(
+            "/users/me",
+            get(users::get_me).merge(
+                delete(account_deletion::delete_account)
+                    .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(8 * 1024 * 1024))
+                    .layer::<_, std::convert::Infallible>(RateLimitLayer::new(
+                        InMemoryStore::new(),
+                        RateLimitConfig {
+                            window: Duration::from_secs(60 * 60),
+                            max_requests: 3,
+                        },
+                    )),
+            ),
+        )
+        .route(
+            "/users/me/deletion-preview",
+            get(account_deletion::preview).layer::<_, std::convert::Infallible>(
+                RateLimitLayer::new(
+                    InMemoryStore::new(),
+                    RateLimitConfig {
+                        window: Duration::from_secs(60),
+                        max_requests: 10,
+                    },
+                ),
+            ),
+        )
         .route("/users/lookup", get(users::lookup_user))
         .route("/users/:user_id", get(users::get_user))
         // --- Workspaces ---
         .route("/workspaces", get(workspaces::list_workspaces))
         .route("/workspaces", post(workspaces::create_workspace))
         .route("/workspaces/:workspace_id", get(workspaces::get_workspace))
-        .route("/workspaces/:workspace_id", put(workspaces::update_workspace))
+        .route(
+            "/workspaces/:workspace_id",
+            put(workspaces::update_workspace),
+        )
         .route(
             "/workspaces/:workspace_id/members",
             get(workspaces::list_members),
@@ -95,7 +123,10 @@ fn v1_routes() -> Router<AppState> {
         .route("/vault/search", get(vaults::search_items))
         .route("/vault/favorites", get(vaults::list_favorites))
         .route("/vault/items/:item_id/favorite", post(vaults::add_favorite))
-        .route("/vault/items/:item_id/favorite", delete(vaults::remove_favorite))
+        .route(
+            "/vault/items/:item_id/favorite",
+            delete(vaults::remove_favorite),
+        )
         .route("/vault/recent", get(vaults::recent_items))
         .route("/vault/export", post(vaults::export_vault))
         .route(
@@ -103,7 +134,10 @@ fn v1_routes() -> Router<AppState> {
             post(vaults::import_vault).layer(DefaultBodyLimit::max(50 * 1024 * 1024)),
         )
         // --- Hierarchy ---
-        .route("/vault/items/:item_id/children", get(hierarchy::get_children))
+        .route(
+            "/vault/items/:item_id/children",
+            get(hierarchy::get_children),
+        )
         .route("/vault/tree", get(hierarchy::get_tree))
         // --- Projects ---
         .route("/projects", post(projects::create_project))
@@ -111,24 +145,48 @@ fn v1_routes() -> Router<AppState> {
         .route("/projects/:project_id", get(projects::get_project))
         .route("/projects/:project_id", put(projects::update_project))
         .route("/projects/:project_id", delete(projects::delete_project))
-        .route("/projects/:project_id/credentials", get(projects::project_credentials))
+        .route(
+            "/projects/:project_id/credentials",
+            get(projects::project_credentials),
+        )
         // --- Services ---
         .route("/services", post(services::create_service))
         .route("/services", get(services::list_services))
         .route("/services/:service_id", get(services::get_service))
         .route("/services/:service_id", put(services::update_service))
         .route("/services/:service_id", delete(services::delete_service))
-        .route("/services/:service_id/credentials", get(services::service_credentials))
+        .route(
+            "/services/:service_id/credentials",
+            get(services::service_credentials),
+        )
         // --- Credential Usage ---
         .route("/vault/items/:item_id/usage", post(usage::create_usage))
         .route("/vault/items/:item_id/usage", get(usage::list_usage))
-        .route("/vault/items/:item_id/usage/:usage_id", delete(usage::delete_usage))
+        .route(
+            "/vault/items/:item_id/usage/:usage_id",
+            delete(usage::delete_usage),
+        )
         // --- Sharing / Invitations ---
-        .route("/vault/items/:item_id/invitations", post(sharing::create_invitation))
-        .route("/vault/items/:item_id/invitations", get(sharing::list_invitations))
-        .route("/invitations/:invitation_id/accept", post(sharing::accept_invitation))
-        .route("/invitations/:invitation_id/decline", post(sharing::decline_invitation))
-        .route("/invitations/:invitation_id", delete(sharing::revoke_invitation))
+        .route(
+            "/vault/items/:item_id/invitations",
+            post(sharing::create_invitation),
+        )
+        .route(
+            "/vault/items/:item_id/invitations",
+            get(sharing::list_invitations),
+        )
+        .route(
+            "/invitations/:invitation_id/accept",
+            post(sharing::accept_invitation),
+        )
+        .route(
+            "/invitations/:invitation_id/decline",
+            post(sharing::decline_invitation),
+        )
+        .route(
+            "/invitations/:invitation_id",
+            delete(sharing::revoke_invitation),
+        )
         .route(
             "/vault/items/:item_id/permissions/:user_id",
             delete(sharing::remove_permission),

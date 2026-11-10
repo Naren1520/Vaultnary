@@ -35,9 +35,10 @@ pub async fn run() -> anyhow::Result<()> {
     info!("Database migrations are up to date");
 
     let state = AppState::new(db.clone(), config.clone());
+    tokio::spawn(crate::email_outbox::run(db.clone()));
 
-    let cors_origin = std::env::var("CORS_ORIGIN")
-        .unwrap_or_else(|_| "http://localhost:5173".to_string());
+    let cors_origin =
+        std::env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:5173".to_string());
 
     let cors = CorsLayer::new()
         .allow_origin(
@@ -81,14 +82,17 @@ pub async fn run() -> anyhow::Result<()> {
     info!(%addr, "Listening");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
 
 fn init_tracing(config: &Config) {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     match config.log_format {
         LogFormat::Json => {

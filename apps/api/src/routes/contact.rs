@@ -58,15 +58,17 @@ pub async fn submit(Json(request): Json<ContactRequest>) -> impl IntoResponse {
             tracing::error!("Contact form is unavailable because RESEND_API_KEY is not configured");
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
-                Json(json!({ "error": "The contact form is temporarily unavailable. Please email us directly." })),
+                Json(
+                    json!({ "error": "The contact form is temporarily unavailable. Please email us directly." }),
+                ),
             );
         }
     };
 
     let from = std::env::var("EMAIL_FROM")
         .unwrap_or_else(|_| "Vaultnary <noreply@vaultnary.app>".to_string());
-    let to = std::env::var("CONTACT_EMAIL")
-        .unwrap_or_else(|_| "narensonu1520@gmail.com".to_string());
+    let to =
+        std::env::var("CONTACT_EMAIL").unwrap_or_else(|_| "narensonu1520@gmail.com".to_string());
     let html = format!(
         "<h2>New Vaultnary enquiry</h2><p><strong>From:</strong> {} ({})</p><p><strong>Topic:</strong> {}</p><p><strong>Message:</strong></p><p>{}</p>",
         escape_html(name),
@@ -98,14 +100,18 @@ pub async fn submit(Json(request): Json<ContactRequest>) -> impl IntoResponse {
             tracing::error!(status = %response.status(), "Resend rejected a contact enquiry");
             (
                 StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": "We couldn't send your message right now. Please try again or email us directly." })),
+                Json(
+                    json!({ "error": "We couldn't send your message right now. Please try again or email us directly." }),
+                ),
             )
         }
         Err(error) => {
             tracing::error!(%error, "Failed to send contact enquiry through Resend");
             (
                 StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": "We couldn't send your message right now. Please try again or email us directly." })),
+                Json(
+                    json!({ "error": "We couldn't send your message right now. Please try again or email us directly." }),
+                ),
             )
         }
     }

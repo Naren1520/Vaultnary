@@ -1,17 +1,8 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Extension, Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Extension, Json};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 async fn insert_audit(db: &sqlx::PgPool, actor_id: Uuid, action_type: &str) {
@@ -40,7 +31,10 @@ pub async fn setup_recovery(
         .get("integrity_tag")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let kdf_params = body.get("kdf_params").cloned().unwrap_or(serde_json::json!({}));
+    let kdf_params = body
+        .get("kdf_params")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
 
     if encrypted_private_key.is_empty() || integrity_tag.is_empty() {
         return Err(ApiError::new(AppError::BadRequest(
@@ -53,10 +47,14 @@ pub async fn setup_recovery(
 
     /* Decode hex/base64 blobs */
     let key_bytes = decode_bytes(encrypted_private_key).ok_or_else(|| {
-        ApiError::new(AppError::BadRequest("encrypted_private_key: invalid encoding".into()))
+        ApiError::new(AppError::BadRequest(
+            "encrypted_private_key: invalid encoding".into(),
+        ))
     })?;
     let tag_bytes = decode_bytes(integrity_tag).ok_or_else(|| {
-        ApiError::new(AppError::BadRequest("integrity_tag: invalid encoding".into()))
+        ApiError::new(AppError::BadRequest(
+            "integrity_tag: invalid encoding".into(),
+        ))
     })?;
 
     sqlx::query(
@@ -88,15 +86,16 @@ pub async fn recovery_status(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let exists: Option<(bool,)> = sqlx::query_as(
-        "SELECT true FROM recovery_material WHERE user_id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let exists: Option<(bool,)> =
+        sqlx::query_as("SELECT true FROM recovery_material WHERE user_id = $1")
+            .bind(auth.user_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    Ok(Json(serde_json::json!({ "data": { "configured": exists.is_some() } })))
+    Ok(Json(
+        serde_json::json!({ "data": { "configured": exists.is_some() } }),
+    ))
 }
 
 /* POST /api/v1/auth/recover (unauthenticated) */
@@ -112,7 +111,9 @@ pub async fn recover(
         .to_lowercase();
 
     if email.is_empty() {
-        return Err(ApiError::new(AppError::BadRequest("email is required".into())));
+        return Err(ApiError::new(AppError::BadRequest(
+            "email is required".into(),
+        )));
     }
 
     let db = state.db();
@@ -132,12 +133,10 @@ pub async fn recover(
         row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     /* Mark password change required */
-    let _ = sqlx::query(
-        "UPDATE users SET password_change_required = true WHERE id = $1",
-    )
-    .bind(user_id)
-    .execute(db)
-    .await;
+    let _ = sqlx::query("UPDATE users SET password_change_required = true WHERE id = $1")
+        .bind(user_id)
+        .execute(db)
+        .await;
 
     insert_audit(db, user_id, "user.recovery_used").await;
 
@@ -171,8 +170,16 @@ fn decode_bytes(s: &str) -> Option<Vec<u8>> {
     while i < bytes.len() {
         let a = table[bytes[i] as usize];
         let b = table[bytes[i + 1] as usize];
-        let c = if bytes[i + 2] == b'=' { 0 } else { table[bytes[i + 2] as usize] };
-        let d = if bytes[i + 3] == b'=' { 0 } else { table[bytes[i + 3] as usize] };
+        let c = if bytes[i + 2] == b'=' {
+            0
+        } else {
+            table[bytes[i + 2] as usize]
+        };
+        let d = if bytes[i + 3] == b'=' {
+            0
+        } else {
+            table[bytes[i + 3] as usize]
+        };
         if a == 255 || b == 255 || c == 255 || d == 255 {
             return None;
         }
@@ -188,4 +195,6 @@ fn decode_bytes(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-fn base64_decode(_s: &str) -> Option<Vec<u8>> { None }
+fn base64_decode(_s: &str) -> Option<Vec<u8>> {
+    None
+}

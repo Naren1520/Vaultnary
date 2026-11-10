@@ -23,19 +23,33 @@ const MAX_NAME_LEN: usize = 100;
 const MAX_DESC_LEN: usize = 500;
 
 fn validate_project_fields(body: &serde_json::Value) -> Result<(String, Option<String>), ApiError> {
-    let name = body.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let name = body
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     if name.is_empty() || name.len() > MAX_NAME_LEN {
         return Err(ApiError::with_details(
             AppError::UnprocessableEntity("name: must be 1-100 chars".into()),
-            vec![ErrorDetail { field: "name".into(), rule: "length_1_100".into() }],
+            vec![ErrorDetail {
+                field: "name".into(),
+                rule: "length_1_100".into(),
+            }],
         ));
     }
-    let description = body.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let description = body
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     if let Some(ref d) = description {
         if d.len() > MAX_DESC_LEN {
             return Err(ApiError::with_details(
                 AppError::UnprocessableEntity("description: max 500 chars".into()),
-                vec![ErrorDetail { field: "description".into(), rule: "max_500".into() }],
+                vec![ErrorDetail {
+                    field: "description".into(),
+                    rule: "max_500".into(),
+                }],
             ));
         }
     }
@@ -73,14 +87,21 @@ pub async fn create_project(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct ProjectResp { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
+    struct ProjectResp {
+        id: Uuid,
+        workspace_id: Uuid,
+        name: String,
+        description: Option<String>,
+        created_at: String,
+    }
     Ok((
         StatusCode::CREATED,
         Json(serde_json::json!({ "data": ProjectResp {
             id, workspace_id, name, description,
             created_at: now.to_string(),
         }})),
-    ).into_response())
+    )
+        .into_response())
 }
 
 /* GET /api/v1/projects */
@@ -103,10 +124,23 @@ pub async fn list_projects(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct ProjectItem { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
-    let items: Vec<ProjectItem> = rows.into_iter().map(|(id, workspace_id, name, desc, ca)| ProjectItem {
-        id, workspace_id, name, description: desc, created_at: ca.to_string(),
-    }).collect();
+    struct ProjectItem {
+        id: Uuid,
+        workspace_id: Uuid,
+        name: String,
+        description: Option<String>,
+        created_at: String,
+    }
+    let items: Vec<ProjectItem> = rows
+        .into_iter()
+        .map(|(id, workspace_id, name, desc, ca)| ProjectItem {
+            id,
+            workspace_id,
+            name,
+            description: desc,
+            created_at: ca.to_string(),
+        })
+        .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))
 }
@@ -134,8 +168,16 @@ pub async fn get_project(
     let (id, workspace_id, name, description, created_at) =
         row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
     #[derive(Serialize)]
-    struct ProjectResp { id: Uuid, workspace_id: Uuid, name: String, description: Option<String>, created_at: String }
-    Ok(Json(serde_json::json!({ "data": ProjectResp { id, workspace_id, name, description, created_at: created_at.to_string() } })))
+    struct ProjectResp {
+        id: Uuid,
+        workspace_id: Uuid,
+        name: String,
+        description: Option<String>,
+        created_at: String,
+    }
+    Ok(Json(
+        serde_json::json!({ "data": ProjectResp { id, workspace_id, name, description, created_at: created_at.to_string() } }),
+    ))
 }
 
 /* PUT /api/v1/projects/:project_id */
@@ -147,11 +189,12 @@ pub async fn update_project(
 ) -> Result<impl IntoResponse, ApiError> {
     let (name, description) = validate_project_fields(&body)?;
     let db = state.db();
-    let workspace_id: Option<(Uuid,)> = sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
-        .bind(project_id)
-        .fetch_optional(db)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     let workspace_id = workspace_id
         .map(|(workspace_id,)| workspace_id)
         .ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -184,10 +227,10 @@ pub async fn delete_project(
 
     let workspace_id: Option<(Uuid,)> =
         sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
-    .bind(project_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+            .bind(project_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let workspace_id = workspace_id
         .map(|(workspace_id,)| workspace_id)
@@ -197,7 +240,10 @@ pub async fn delete_project(
         return Err(ApiError::new(AppError::Forbidden));
     }
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     /* Delete credential usage records for items in this project's services */
     sqlx::query(
@@ -230,7 +276,9 @@ pub async fn delete_project(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     Ok(StatusCode::OK.into_response())
 }
 
@@ -242,13 +290,12 @@ pub async fn project_credentials(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    let workspace_id: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT workspace_id FROM projects WHERE id = $1",
-    )
-    .bind(project_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let workspace_id = workspace_id
         .map(|(workspace_id,)| workspace_id)
@@ -272,8 +319,19 @@ pub async fn project_credentials(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     #[derive(Serialize)]
-    struct CredItem { id: Uuid, name: String, credential_type: String }
-    let items: Vec<CredItem> = rows.into_iter().map(|(id, name, ct)| CredItem { id, name, credential_type: ct }).collect();
+    struct CredItem {
+        id: Uuid,
+        name: String,
+        credential_type: String,
+    }
+    let items: Vec<CredItem> = rows
+        .into_iter()
+        .map(|(id, name, ct)| CredItem {
+            id,
+            name,
+            credential_type: ct,
+        })
+        .collect();
     Ok(Json(serde_json::json!({ "data": items })))
 }
 

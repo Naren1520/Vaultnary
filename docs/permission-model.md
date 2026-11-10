@@ -181,4 +181,4 @@ Every permission-relevant action writes an `audit_events` row:
 | Invitation revoked | invitation.revoked |
 | Collaborator removed | permission.changed |
 
-Audit events are append-only - the database role used by the application is granted INSERT and SELECT only on `audit_events`. No UPDATE or DELETE is possible at the application level.
+Audit events are append-only for normal application operations: the application role receives INSERT and SELECT, but no direct UPDATE or DELETE on `audit_events`. Account deletion uses the narrowly scoped `purge_account_audit_events` security-definer function to remove only rows associated with the account being deleted; execute permission is granted only to `vaultnary_app` when that role exists.

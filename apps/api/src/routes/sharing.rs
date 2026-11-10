@@ -9,9 +9,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    routes::vaults::decode_base64_or_hex,
+    error::ApiError, middleware::auth::AuthUser, routes::vaults::decode_base64_or_hex,
     state::AppState,
 };
 use shared::AppError;
@@ -62,6 +60,43 @@ async fn require_owner_or_coowner(
     }
 }
 
+async fn lock_item_for_sharing(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    item_id: Uuid,
+) -> Result<(), ApiError> {
+    let item: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM vault_items WHERE id = $1 FOR UPDATE")
+            .bind(item_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    item.map(|_| ())
+        .ok_or_else(|| ApiError::new(AppError::NotFound))
+}
+
+async fn require_owner_or_coowner_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    item_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), ApiError> {
+    let permission: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM credential_permissions WHERE item_id = $1 AND user_id = $2",
+    )
+    .bind(item_id)
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    match permission {
+        None => Err(ApiError::new(AppError::NotFound)),
+        Some((role,)) if role != "owner" && role != "co_owner" => {
+            Err(ApiError::new(AppError::Forbidden))
+        }
+        _ => Ok(()),
+    }
+}
+
 /* POST /api/v1/vault/items/:item_id/invitations */
 pub async fn create_invitation(
     State(state): State<AppState>,
@@ -79,10 +114,15 @@ pub async fn create_invitation(
         .trim()
         .to_lowercase();
     if invitee_email.is_empty() {
-        return Err(ApiError::new(AppError::UnprocessableEntity("invitee_email is required".into())));
+        return Err(ApiError::new(AppError::UnprocessableEntity(
+            "invitee_email is required".into(),
+        )));
     }
 
-    let role = body.get("role").and_then(|v| v.as_str()).unwrap_or("viewer");
+    let role = body
+        .get("role")
+        .and_then(|v| v.as_str())
+        .unwrap_or("viewer");
     if !["viewer", "editor", "co_owner"].contains(&role) {
         return Err(ApiError::new(AppError::UnprocessableEntity(
             "role must be viewer, editor, or co_owner".into(),
@@ -96,7 +136,10 @@ pub async fn create_invitation(
     let now = OffsetDateTime::now_utc();
     let expires_at = now + time::Duration::days(7);
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query(
         "INSERT INTO share_invitations
@@ -117,13 +160,11 @@ pub async fn create_invitation(
     /* Store key envelope for invitee if DEK provided */
     if let Some(dek) = encrypted_dek_bytes {
         /* Look up invitee user id */
-        let invitee: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT id FROM users WHERE email = $1",
-        )
-        .bind(&invitee_email)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+        let invitee: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE email = $1")
+            .bind(&invitee_email)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
         if let Some((invitee_id,)) = invitee {
             sqlx::query(
@@ -142,7 +183,9 @@ pub async fn create_invitation(
         }
     }
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,
@@ -154,7 +197,11 @@ pub async fn create_invitation(
     )
     .await;
 
-    Ok((StatusCode::CREATED, Json(serde_json::json!({ "data": { "id": id } }))).into_response())
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "data": { "id": id } })),
+    )
+        .into_response())
 }
 
 /* GET /api/v1/vault/items/:item_id/invitations */
@@ -185,9 +232,17 @@ pub async fn list_invitations(
         expires_at: String,
         created_at: String,
     }
-    let items: Vec<InvItem> = rows.into_iter().map(|(id, email, role, state, exp, ca)| InvItem {
-        id, invitee_email: email, role, state, expires_at: exp.to_string(), created_at: ca.to_string(),
-    }).collect();
+    let items: Vec<InvItem> = rows
+        .into_iter()
+        .map(|(id, email, role, state, exp, ca)| InvItem {
+            id,
+            invitee_email: email,
+            role,
+            state,
+            expires_at: exp.to_string(),
+            created_at: ca.to_string(),
+        })
+        .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))
 }
@@ -219,19 +274,36 @@ pub async fn accept_invitation(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (item_id, role, state, expires_at) =
-        inv.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let (item_id, _, _, _) = inv.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
-    if state != "pending" {
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+
+    lock_item_for_sharing(&mut tx, item_id).await?;
+    let locked_invitation: Option<(String, String, OffsetDateTime)> = sqlx::query_as(
+        "SELECT role, state, expires_at FROM share_invitations
+         WHERE id = $1 AND invitee_email = $2
+         FOR UPDATE",
+    )
+    .bind(invitation_id)
+    .bind(&user_email)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (role, invitation_state, expires_at) =
+        locked_invitation.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if invitation_state != "pending" {
         return Err(ApiError::new(AppError::UnprocessableEntity(
             "invitation is not in pending state".into(),
         )));
     }
     if expires_at < OffsetDateTime::now_utc() {
-        return Err(ApiError::new(AppError::UnprocessableEntity("invitation has expired".into())));
+        return Err(ApiError::new(AppError::UnprocessableEntity(
+            "invitation has expired".into(),
+        )));
     }
-
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     sqlx::query(
         "UPDATE share_invitations SET state = 'accepted', updated_at = NOW() WHERE id = $1",
@@ -255,7 +327,9 @@ pub async fn accept_invitation(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,
@@ -285,14 +359,13 @@ pub async fn decline_invitation(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     let (user_email,) = user_email.ok_or_else(|| ApiError::new(AppError::Unauthorized))?;
 
-    let inv: Option<(String,)> = sqlx::query_as(
-        "SELECT state FROM share_invitations WHERE id = $1 AND invitee_email = $2",
-    )
-    .bind(invitation_id)
-    .bind(&user_email)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let inv: Option<(String,)> =
+        sqlx::query_as("SELECT state FROM share_invitations WHERE id = $1 AND invitee_email = $2")
+            .bind(invitation_id)
+            .bind(&user_email)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let (state_val,) = inv.ok_or_else(|| ApiError::new(AppError::NotFound))?;
     if state_val != "pending" {
@@ -301,11 +374,13 @@ pub async fn decline_invitation(
         )));
     }
 
-    sqlx::query("UPDATE share_invitations SET state = 'declined', updated_at = NOW() WHERE id = $1")
-        .bind(invitation_id)
-        .execute(db)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    sqlx::query(
+        "UPDATE share_invitations SET state = 'declined', updated_at = NOW() WHERE id = $1",
+    )
+    .bind(invitation_id)
+    .execute(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,
@@ -329,13 +404,12 @@ pub async fn revoke_invitation(
     let db = state.db();
 
     type InvRow = (Uuid, Uuid, String);
-    let inv: Option<InvRow> = sqlx::query_as(
-        "SELECT item_id, inviter_id, state FROM share_invitations WHERE id = $1",
-    )
-    .bind(invitation_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let inv: Option<InvRow> =
+        sqlx::query_as("SELECT item_id, inviter_id, state FROM share_invitations WHERE id = $1")
+            .bind(invitation_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let (item_id, inviter_id, inv_state) = inv.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
@@ -358,7 +432,9 @@ pub async fn revoke_invitation(
     }
 
     if inv_state == "revoked" {
-        return Err(ApiError::new(AppError::UnprocessableEntity("invitation already revoked".into())));
+        return Err(ApiError::new(AppError::UnprocessableEntity(
+            "invitation already revoked".into(),
+        )));
     }
 
     sqlx::query("UPDATE share_invitations SET state = 'revoked', updated_at = NOW() WHERE id = $1")
@@ -387,55 +463,62 @@ pub async fn remove_permission(
     Path((item_id, target_user_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
-    require_owner_or_coowner(db, item_id, auth.user_id).await?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    /* Check removal would not leave zero owners */
-    let owner_count: (i64,) = sqlx::query_as(
+    lock_item_for_sharing(&mut tx, item_id).await?;
+    sqlx::query(
+        "SELECT id FROM credential_permissions
+         WHERE item_id = $1 ORDER BY user_id FOR UPDATE",
+    )
+    .bind(item_id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    require_owner_or_coowner_in_tx(&mut tx, item_id, auth.user_id).await?;
+
+    let owner_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM credential_permissions WHERE item_id = $1 AND role = 'owner'",
     )
     .bind(item_id)
-    .fetch_one(db)
+    .fetch_one(&mut *tx)
     .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let target_role: Option<(String,)> = sqlx::query_as(
         "SELECT role FROM credential_permissions WHERE item_id = $1 AND user_id = $2",
     )
     .bind(item_id)
     .bind(target_user_id)
-    .fetch_optional(db)
+    .fetch_optional(&mut *tx)
     .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (role,) = target_role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
-    if role == "owner" && owner_count.0 <= 1 {
+    if role == "owner" && owner_count <= 1 {
         return Err(ApiError::new(AppError::UnprocessableEntity(
             "cannot remove the sole owner".into(),
         )));
     }
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    sqlx::query("DELETE FROM credential_permissions WHERE item_id = $1 AND user_id = $2")
+        .bind(item_id)
+        .bind(target_user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    sqlx::query(
-        "DELETE FROM credential_permissions WHERE item_id = $1 AND user_id = $2",
-    )
-    .bind(item_id)
-    .bind(target_user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    sqlx::query("DELETE FROM credential_key_envelopes WHERE item_id = $1 AND user_id = $2")
+        .bind(item_id)
+        .bind(target_user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    sqlx::query(
-        "DELETE FROM credential_key_envelopes WHERE item_id = $1 AND user_id = $2",
-    )
-    .bind(item_id)
-    .bind(target_user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,

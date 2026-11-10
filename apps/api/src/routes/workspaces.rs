@@ -100,6 +100,42 @@ pub(crate) async fn workspace_member_role(
     })
 }
 
+async fn lock_workspace(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace_id: Uuid,
+) -> Result<(), ApiError> {
+    let workspace: Option<(Uuid,)> =
+        sqlx::query_as("SELECT id FROM workspaces WHERE id = $1 FOR UPDATE")
+            .bind(workspace_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    workspace
+        .map(|_| ())
+        .ok_or_else(|| ApiError::new(AppError::NotFound))
+}
+
+async fn workspace_member_role_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace_id: Uuid,
+    user_id: Uuid,
+) -> Result<WorkspaceRole, ApiError> {
+    let role: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let (role,) = role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    WorkspaceRole::try_from(role.as_str()).map_err(|_| {
+        ApiError::new(AppError::Internal(anyhow::anyhow!(
+            "invalid workspace role"
+        )))
+    })
+}
+
 fn validate_workspace_name(body: &serde_json::Value) -> Result<String, ApiError> {
     let name = body
         .get("name")
@@ -399,7 +435,13 @@ pub async fn add_member(
     Path(workspace_id): Path<Uuid>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    let mut tx = state
+        .db()
+        .begin()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    lock_workspace(&mut tx, workspace_id).await?;
+    let actor_role = workspace_member_role_in_tx(&mut tx, workspace_id, auth.user_id).await?;
     if !actor_role.can_manage() {
         return Err(ApiError::new(AppError::Forbidden));
     }
@@ -412,7 +454,7 @@ pub async fn add_member(
 
     let user_id: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = $1")
         .bind(&email)
-        .fetch_optional(state.db())
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (user_id,) = user_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -424,7 +466,7 @@ pub async fn add_member(
     .bind(workspace_id)
     .bind(user_id)
     .bind(role.as_str())
-    .execute(state.db())
+    .execute(&mut *tx)
     .await;
 
     match result {
@@ -442,6 +484,9 @@ pub async fn add_member(
         }
         Err(error) => return Err(ApiError::new(AppError::Internal(error.into()))),
     }
+    tx.commit()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     Ok((
         StatusCode::CREATED,
@@ -462,7 +507,13 @@ pub async fn update_member_role(
     Path((workspace_id, user_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    let mut tx = state
+        .db()
+        .begin()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    lock_workspace(&mut tx, workspace_id).await?;
+    let actor_role = workspace_member_role_in_tx(&mut tx, workspace_id, auth.user_id).await?;
     if !actor_role.can_manage() {
         return Err(ApiError::new(AppError::Forbidden));
     }
@@ -474,7 +525,7 @@ pub async fn update_member_role(
 
     let owner_id: Option<(Uuid,)> = sqlx::query_as("SELECT owner_id FROM workspaces WHERE id = $1")
         .bind(workspace_id)
-        .fetch_optional(state.db())
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (owner_id,) = owner_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -489,7 +540,7 @@ pub async fn update_member_role(
     )
     .bind(workspace_id)
     .bind(user_id)
-    .fetch_optional(state.db())
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (target_role,) = target_role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -503,13 +554,16 @@ pub async fn update_member_role(
     .bind(new_role.as_str())
     .bind(workspace_id)
     .bind(user_id)
-    .execute(state.db())
+    .execute(&mut *tx)
     .await
     .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     if result.rows_affected() == 0 {
         return Err(ApiError::new(AppError::NotFound));
     }
+    tx.commit()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     Ok(StatusCode::OK)
 }
@@ -520,14 +574,20 @@ pub async fn remove_member(
     Extension(auth): Extension<AuthUser>,
     Path((workspace_id, user_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let actor_role = workspace_member_role(state.db(), workspace_id, auth.user_id).await?;
+    let mut tx = state
+        .db()
+        .begin()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    lock_workspace(&mut tx, workspace_id).await?;
+    let actor_role = workspace_member_role_in_tx(&mut tx, workspace_id, auth.user_id).await?;
     if !actor_role.can_manage() {
         return Err(ApiError::new(AppError::Forbidden));
     }
 
     let owner_id: Option<(Uuid,)> = sqlx::query_as("SELECT owner_id FROM workspaces WHERE id = $1")
         .bind(workspace_id)
-        .fetch_optional(state.db())
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (owner_id,) = owner_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -542,7 +602,7 @@ pub async fn remove_member(
     )
     .bind(workspace_id)
     .bind(user_id)
-    .fetch_optional(state.db())
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
     let (target_role,) = target_role.ok_or_else(|| ApiError::new(AppError::NotFound))?;
@@ -554,13 +614,16 @@ pub async fn remove_member(
         sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2")
             .bind(workspace_id)
             .bind(user_id)
-            .execute(state.db())
+            .execute(&mut *tx)
             .await
             .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     if result.rows_affected() == 0 {
         return Err(ApiError::new(AppError::NotFound));
     }
+    tx.commit()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     Ok(StatusCode::OK)
 }

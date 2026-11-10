@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FolderKey, GitBranch, FolderOpen, Server, ShieldCheck, ScrollText, Users } from 'lucide-react';
+import { FolderKey, GitBranch, FolderOpen, Server, ShieldCheck, ScrollText, Users, CircleUserRound } from 'lucide-react';
 const navItems = [
     { label: 'Vault', href: '/app/vault', icon: _jsx(FolderKey, { size: 16, "aria-hidden": "true" }) },
     { label: 'Hierarchy', href: '/app/hierarchy', icon: _jsx(GitBranch, { size: 16, "aria-hidden": "true" }) },
@@ -10,6 +10,7 @@ const navItems = [
     { label: 'Workspaces', href: '/app/workspaces', icon: _jsx(Users, { size: 16, "aria-hidden": "true" }) },
     { label: 'Security', href: '/app/security', icon: _jsx(ShieldCheck, { size: 16, "aria-hidden": "true" }) },
     { label: 'Audit Log', href: '/app/audit', icon: _jsx(ScrollText, { size: 16, "aria-hidden": "true" }) },
+    { label: 'Profile', href: '/app/profile', icon: _jsx(CircleUserRound, { size: 16, "aria-hidden": "true" }) },
 ];
 export default function Sidebar() {
     const location = useLocation();

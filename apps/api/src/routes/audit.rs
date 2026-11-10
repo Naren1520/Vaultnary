@@ -7,11 +7,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 #[derive(Deserialize)]
@@ -30,7 +26,14 @@ pub async fn list_events(
     let db = state.db();
     let limit = params.limit.unwrap_or(50).min(100).max(1);
 
-    type Row = (Uuid, String, Option<Uuid>, Option<String>, Option<String>, OffsetDateTime);
+    type Row = (
+        Uuid,
+        String,
+        Option<Uuid>,
+        Option<String>,
+        Option<String>,
+        OffsetDateTime,
+    );
 
     let rows: Vec<Row> = if let Some(action_filter) = params.action_type {
         sqlx::query_as(

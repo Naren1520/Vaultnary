@@ -1,6 +1,7 @@
 mod bootstrap;
 mod config;
 mod email;
+mod email_outbox;
 mod error;
 mod middleware;
 mod routes;

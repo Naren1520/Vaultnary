@@ -7,11 +7,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 /* GET /api/v1/security/sessions -same data as /auth/sessions */
@@ -21,7 +17,15 @@ pub async fn list_sessions(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type Row = (Uuid, OffsetDateTime, Option<OffsetDateTime>, OffsetDateTime, Option<String>, Option<String>, Option<String>);
+    type Row = (
+        Uuid,
+        OffsetDateTime,
+        Option<OffsetDateTime>,
+        OffsetDateTime,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    );
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT id, created_at, last_used_at, expires_at,
                 ip_address::text, user_agent, device_fingerprint
@@ -68,7 +72,15 @@ pub async fn security_events(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type Row = (Uuid, String, Option<Uuid>, Option<String>, Option<String>, serde_json::Value, OffsetDateTime);
+    type Row = (
+        Uuid,
+        String,
+        Option<Uuid>,
+        Option<String>,
+        Option<String>,
+        serde_json::Value,
+        OffsetDateTime,
+    );
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT id, action_type, resource_id, resource_type,
                 ip_address::text, metadata, created_at
@@ -148,7 +160,10 @@ pub async fn security_invitations(
     let items: Vec<InvItem> = rows
         .into_iter()
         .map(|(id, item_id, role, _state, exp)| InvItem {
-            id, item_id, role, expires_at: exp.to_string(),
+            id,
+            item_id,
+            role,
+            expires_at: exp.to_string(),
         })
         .collect();
 
@@ -185,7 +200,12 @@ pub async fn shared_with_me(
 
     let items: Vec<SharedItem> = rows
         .into_iter()
-        .map(|(id, name, ctype, role)| SharedItem { id, name, credential_type: ctype, role })
+        .map(|(id, name, ctype, role)| SharedItem {
+            id,
+            name,
+            credential_type: ctype,
+            role,
+        })
         .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))

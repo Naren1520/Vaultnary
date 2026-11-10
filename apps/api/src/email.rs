@@ -1,5 +1,35 @@
 use tracing::{info, warn};
 
+pub async fn send_email(to: &str, subject: &str, html: &str) -> anyhow::Result<()> {
+    let api_key = std::env::var("RESEND_API_KEY")
+        .ok()
+        .filter(|key| !key.is_empty() && key != "re_your_resend_api_key_here")
+        .ok_or_else(|| anyhow::anyhow!("RESEND_API_KEY is not configured"))?;
+    let from = std::env::var("EMAIL_FROM")
+        .unwrap_or_else(|_| "Vaultnary <noreply@vaultnary.app>".to_string());
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()?;
+    let response = client
+        .post("https://api.resend.com/emails")
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        anyhow::bail!("Resend returned {status}");
+    }
+
+    Ok(())
+}
+
 /// Send an email via Resend API.
 /// Falls back to logging the token if RESEND_API_KEY is not set.
 pub async fn send_verification_email(to: &str, token: &str, frontend_url: &str) {
@@ -18,7 +48,11 @@ pub async fn send_verification_email(to: &str, token: &str, frontend_url: &str) 
     let from = std::env::var("EMAIL_FROM")
         .unwrap_or_else(|_| "Vaultnary <noreply@vaultnary.app>".to_string());
 
-    let verify_url = format!("{}/verify-email?token={}", frontend_url.trim_end_matches('/'), token);
+    let verify_url = format!(
+        "{}/verify-email?token={}",
+        frontend_url.trim_end_matches('/'),
+        token
+    );
 
     let body = serde_json::json!({
         "from": from,
@@ -70,8 +104,7 @@ pub async fn send_password_reset_email(to: &str, token: &str, frontend_url: &str
         _ => {
             info!(
                 to = to,
-                "RESEND_API_KEY not set - reset token (dev only): {}",
-                token
+                "RESEND_API_KEY not set - reset token (dev only): {}", token
             );
             return;
         }
@@ -80,7 +113,11 @@ pub async fn send_password_reset_email(to: &str, token: &str, frontend_url: &str
     let from = std::env::var("EMAIL_FROM")
         .unwrap_or_else(|_| "Vaultnary <noreply@vaultnary.app>".to_string());
 
-    let reset_url = format!("{}/reset-password?token={}", frontend_url.trim_end_matches('/'), token);
+    let reset_url = format!(
+        "{}/reset-password?token={}",
+        frontend_url.trim_end_matches('/'),
+        token
+    );
 
     let body = serde_json::json!({
         "from": from,

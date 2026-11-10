@@ -121,25 +121,40 @@ fn validate_item_fields(body: &serde_json::Value) -> Result<(), ApiError> {
     /* name */
     let name = body.get("name").and_then(|v| v.as_str()).unwrap_or("");
     if name.is_empty() || name.len() > MAX_NAME_LEN {
-        details.push(ErrorDetail { field: "name".into(), rule: "length_1_255".into() });
+        details.push(ErrorDetail {
+            field: "name".into(),
+            rule: "length_1_255".into(),
+        });
     }
 
     /* credential_type */
-    let ctype_str = body.get("credential_type").and_then(|v| v.as_str()).unwrap_or("");
+    let ctype_str = body
+        .get("credential_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if CredentialType::from_str(ctype_str).is_none() {
-        details.push(ErrorDetail { field: "credential_type".into(), rule: "invalid_enum".into() });
+        details.push(ErrorDetail {
+            field: "credential_type".into(),
+            rule: "invalid_enum".into(),
+        });
     }
 
     /* tags */
     if let Some(tags_val) = body.get("tags") {
         if let Some(arr) = tags_val.as_array() {
             if arr.len() > MAX_TAG_COUNT {
-                details.push(ErrorDetail { field: "tags".into(), rule: "max_20".into() });
+                details.push(ErrorDetail {
+                    field: "tags".into(),
+                    rule: "max_20".into(),
+                });
             }
             for tag in arr {
                 let s = tag.as_str().unwrap_or("");
                 if s.is_empty() || s.len() > MAX_TAG_LEN {
-                    details.push(ErrorDetail { field: "tags".into(), rule: "each_max_50_chars".into() });
+                    details.push(ErrorDetail {
+                        field: "tags".into(),
+                        rule: "each_max_50_chars".into(),
+                    });
                     break;
                 }
             }
@@ -160,7 +175,10 @@ fn validate_item_fields(body: &serde_json::Value) -> Result<(), ApiError> {
     /* notes */
     if let Some(notes) = body.get("notes").and_then(|v| v.as_str()) {
         if notes.len() > MAX_NOTES_LEN {
-            details.push(ErrorDetail { field: "notes".into(), rule: "max_10000_chars".into() });
+            details.push(ErrorDetail {
+                field: "notes".into(),
+                rule: "max_10000_chars".into(),
+            });
         }
     }
 
@@ -211,7 +229,11 @@ pub async fn create_item(
     let tags: Vec<String> = body
         .get("tags")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|t| t.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| t.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let encrypted_payload: Option<&str> = body.get("encrypted_payload").and_then(|v| v.as_str());
     let payload_metadata: Option<&serde_json::Value> = body.get("payload_metadata");
@@ -221,28 +243,28 @@ pub async fn create_item(
     let db = state.db();
 
     /* Verify the user owns a vault */
-    let vault: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM vaults WHERE owner_id = $1 LIMIT 1",
-    )
-    .bind(auth.user_id)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let vault: Option<(Uuid,)> =
+        sqlx::query_as("SELECT id FROM vaults WHERE owner_id = $1 LIMIT 1")
+            .bind(auth.user_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     let vault_id = vault
         .map(|(id,)| id)
         .ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     let item_id = Uuid::new_v4();
-    let encrypted_payload_bytes: Option<Vec<u8>> = encrypted_payload
-        .map(|s| decode_base64_or_hex(s))
-        .flatten();
-    let encrypted_dek_bytes: Option<Vec<u8>> = encrypted_dek
-        .and_then(decode_base64_or_hex);
+    let encrypted_payload_bytes: Option<Vec<u8>> =
+        encrypted_payload.map(|s| decode_base64_or_hex(s)).flatten();
+    let encrypted_dek_bytes: Option<Vec<u8>> = encrypted_dek.and_then(decode_base64_or_hex);
 
     let now = OffsetDateTime::now_utc();
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     /* Insert vault item */
     sqlx::query(
@@ -294,7 +316,9 @@ pub async fn create_item(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     }
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,
@@ -321,7 +345,11 @@ pub async fn create_item(
         inherited_from: None,
     };
 
-    Ok((StatusCode::CREATED, Json(serde_json::json!({ "data": meta }))).into_response())
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "data": meta })),
+    )
+        .into_response())
 }
 
 /* GET /api/v1/vault/items                                             */
@@ -341,8 +369,13 @@ pub async fn list_items(
     let db = state.db();
 
     /* Rows: (id, name, ctype, parent_item_id, tags JSON, notes, is_favorite,
-             last_accessed_at, created_at, updated_at) */
-    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
+    last_accessed_at, created_at, updated_at) */
+    type ItemRow = (
+        Uuid,
+        String,
+        String,
+        Option<Uuid>,
+        Vec<String>,
         Option<String>,
         bool,
         Option<OffsetDateTime>,
@@ -395,26 +428,30 @@ pub async fn list_items(
 
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
-        .map(|(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
-            let tags = tags_val;
-            VaultItemMeta {
-                id,
-                name,
-                credential_type: ctype,
-                parent_item_id: parent_id,
-                tags,
-                notes,
-                payload_metadata: None,
-                is_favorite: is_fav,
-                last_accessed_at: last_acc.map(|t| t.to_string()),
-                created_at: created.to_string(),
-                updated_at: updated.to_string(),
-                inherited_from: None,
-            }
-        })
+        .map(
+            |(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
+                let tags = tags_val;
+                VaultItemMeta {
+                    id,
+                    name,
+                    credential_type: ctype,
+                    parent_item_id: parent_id,
+                    tags,
+                    notes,
+                    payload_metadata: None,
+                    is_favorite: is_fav,
+                    last_accessed_at: last_acc.map(|t| t.to_string()),
+                    created_at: created.to_string(),
+                    updated_at: updated.to_string(),
+                    inherited_from: None,
+                }
+            },
+        )
         .collect();
 
-    Ok(Json(serde_json::json!({ "data": items, "cursor": next_cursor })))
+    Ok(Json(
+        serde_json::json!({ "data": items, "cursor": next_cursor }),
+    ))
 }
 
 /* GET /api/v1/vault/items/:item_id                                    */
@@ -462,7 +499,10 @@ pub async fn get_item(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
         if let Some((anc_id, anc_name)) = ancestor {
-            Some(InheritedFrom { id: anc_id, name: anc_name })
+            Some(InheritedFrom {
+                id: anc_id,
+                name: anc_name,
+            })
         } else {
             return Err(ApiError::new(AppError::NotFound));
         }
@@ -470,7 +510,12 @@ pub async fn get_item(
         None
     };
 
-    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
+    type ItemRow = (
+        Uuid,
+        String,
+        String,
+        Option<Uuid>,
+        Vec<String>,
         Option<String>,
         Option<serde_json::Value>,
         bool,
@@ -493,16 +538,25 @@ pub async fn get_item(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (id, name, ctype, parent_id, tags_val, notes, payload_metadata, is_fav, last_acc, created, updated) =
-        row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let (
+        id,
+        name,
+        ctype,
+        parent_id,
+        tags_val,
+        notes,
+        payload_metadata,
+        is_fav,
+        last_acc,
+        created,
+        updated,
+    ) = row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     /* Update last_accessed_at */
-    let _ = sqlx::query(
-        "UPDATE vault_items SET last_accessed_at = NOW() WHERE id = $1",
-    )
-    .bind(item_id)
-    .execute(db)
-    .await;
+    let _ = sqlx::query("UPDATE vault_items SET last_accessed_at = NOW() WHERE id = $1")
+        .bind(item_id)
+        .execute(db)
+        .await;
 
     insert_audit(
         db,
@@ -570,7 +624,11 @@ pub async fn update_item(
     let tags: Vec<String> = body
         .get("tags")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|t| t.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| t.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let encrypted_payload: Option<&str> = body.get("encrypted_payload").and_then(|v| v.as_str());
     let payload_metadata: Option<&serde_json::Value> = body.get("payload_metadata");
@@ -583,9 +641,8 @@ pub async fn update_item(
             .map_err(ApiError::new)?;
     }
 
-    let encrypted_payload_bytes: Option<Vec<u8>> = encrypted_payload
-        .map(|s| decode_base64_or_hex(s))
-        .flatten();
+    let encrypted_payload_bytes: Option<Vec<u8>> =
+        encrypted_payload.map(|s| decode_base64_or_hex(s)).flatten();
 
     sqlx::query(
         "UPDATE vault_items
@@ -627,11 +684,17 @@ pub async fn delete_item(
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
     /* Require explicit confirm: true */
-    let confirmed = body.get("confirm").and_then(|v| v.as_bool()).unwrap_or(false);
+    let confirmed = body
+        .get("confirm")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     if !confirmed {
         return Err(ApiError::with_details(
             AppError::UnprocessableEntity("confirm: must be true".into()),
-            vec![ErrorDetail { field: "confirm".into(), rule: "required_true".into() }],
+            vec![ErrorDetail {
+                field: "confirm".into(),
+                rule: "required_true".into(),
+            }],
         ));
     }
 
@@ -669,7 +732,10 @@ pub async fn delete_item(
 
     let ids: Vec<Uuid> = descendant_ids.into_iter().map(|(id,)| id).collect();
 
-    let mut tx = db.begin().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     for id in &ids {
         /* Delete usage records */
@@ -703,7 +769,9 @@ pub async fn delete_item(
             .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     }
 
-    tx.commit().await.map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     insert_audit(
         db,
@@ -734,7 +802,10 @@ pub async fn search_items(
     if q.is_empty() || q.len() > 200 {
         return Err(ApiError::with_details(
             AppError::UnprocessableEntity("q: must be 1-200 characters".into()),
-            vec![ErrorDetail { field: "q".into(), rule: "length_1_200".into() }],
+            vec![ErrorDetail {
+                field: "q".into(),
+                rule: "length_1_200".into(),
+            }],
         ));
     }
 
@@ -791,7 +862,12 @@ pub async fn list_favorites(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
+    type ItemRow = (
+        Uuid,
+        String,
+        String,
+        Option<Uuid>,
+        Vec<String>,
         Option<String>,
         Option<OffsetDateTime>,
         OffsetDateTime,
@@ -813,22 +889,24 @@ pub async fn list_favorites(
 
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
-        .map(|(id, name, ctype, parent_id, tags_val, notes, last_acc, created, updated)| {
-            VaultItemMeta {
-                id,
-                name,
-                credential_type: ctype,
-                parent_item_id: parent_id,
-                tags: tags_val,
-                notes,
-                payload_metadata: None,
-                is_favorite: true,
-                last_accessed_at: last_acc.map(|t| t.to_string()),
-                created_at: created.to_string(),
-                updated_at: updated.to_string(),
-                inherited_from: None,
-            }
-        })
+        .map(
+            |(id, name, ctype, parent_id, tags_val, notes, last_acc, created, updated)| {
+                VaultItemMeta {
+                    id,
+                    name,
+                    credential_type: ctype,
+                    parent_item_id: parent_id,
+                    tags: tags_val,
+                    notes,
+                    payload_metadata: None,
+                    is_favorite: true,
+                    last_accessed_at: last_acc.map(|t| t.to_string()),
+                    created_at: created.to_string(),
+                    updated_at: updated.to_string(),
+                    inherited_from: None,
+                }
+            },
+        )
         .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))
@@ -919,7 +997,12 @@ pub async fn recent_items(
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
-    type ItemRow = (Uuid, String, String, Option<Uuid>, Vec<String>,
+    type ItemRow = (
+        Uuid,
+        String,
+        String,
+        Option<Uuid>,
+        Vec<String>,
         Option<String>,
         bool,
         Option<OffsetDateTime>,
@@ -944,22 +1027,24 @@ pub async fn recent_items(
 
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
-        .map(|(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
-            VaultItemMeta {
-                id,
-                name,
-                credential_type: ctype,
-                parent_item_id: parent_id,
-                tags: tags_val,
-                notes,
-                payload_metadata: None,
-                is_favorite: is_fav,
-                last_accessed_at: last_acc.map(|t| t.to_string()),
-                created_at: created.to_string(),
-                updated_at: updated.to_string(),
-                inherited_from: None,
-            }
-        })
+        .map(
+            |(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
+                VaultItemMeta {
+                    id,
+                    name,
+                    credential_type: ctype,
+                    parent_item_id: parent_id,
+                    tags: tags_val,
+                    notes,
+                    payload_metadata: None,
+                    is_favorite: is_fav,
+                    last_accessed_at: last_acc.map(|t| t.to_string()),
+                    created_at: created.to_string(),
+                    updated_at: updated.to_string(),
+                    inherited_from: None,
+                }
+            },
+        )
         .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))

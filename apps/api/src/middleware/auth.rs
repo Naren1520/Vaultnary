@@ -214,8 +214,7 @@ fn unauthorized_response(secure: bool) -> Response {
     )
         .into_response();
 
-    resp.headers_mut()
-        .insert(header::SET_COOKIE, clear_cookie);
+    resp.headers_mut().insert(header::SET_COOKIE, clear_cookie);
 
     resp
 }
@@ -310,10 +309,7 @@ mod tests {
             .header("cookie", "other=abc; vault_session=my_token; another=xyz")
             .body(Body::empty())
             .unwrap();
-        assert_eq!(
-            extract_session_cookie(&req),
-            Some("my_token".to_string())
-        );
+        assert_eq!(extract_session_cookie(&req), Some("my_token".to_string()));
     }
 
     #[test]
@@ -328,10 +324,7 @@ mod tests {
 
     #[test]
     fn extract_session_cookie_returns_none_without_cookie_header() {
-        let req = Request::builder()
-            .uri("/")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
         assert_eq!(extract_session_cookie(&req), None);
     }
 

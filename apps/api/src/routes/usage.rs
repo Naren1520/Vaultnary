@@ -8,11 +8,7 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    error::ApiError,
-    middleware::auth::AuthUser,
-    state::AppState,
-};
+use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
 use shared::AppError;
 
 /* POST /api/v1/vault/items/:item_id/usage */
@@ -95,7 +91,9 @@ pub async fn create_usage(
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     if dup.is_some() {
-        return Err(ApiError::new(AppError::Conflict("usage record already exists".into())));
+        return Err(ApiError::new(AppError::Conflict(
+            "usage record already exists".into(),
+        )));
     }
 
     let id = Uuid::new_v4();
@@ -131,7 +129,8 @@ pub async fn create_usage(
             notes: notes.map(String::from),
             created_at: now.to_string(),
         }})),
-    ).into_response())
+    )
+        .into_response())
 }
 
 /* GET /api/v1/vault/items/:item_id/usage */
@@ -156,7 +155,13 @@ pub async fn list_usage(
         return Err(ApiError::new(AppError::NotFound));
     }
 
-    type UsageRow = (Uuid, Option<Uuid>, Option<Uuid>, Option<String>, OffsetDateTime);
+    type UsageRow = (
+        Uuid,
+        Option<Uuid>,
+        Option<Uuid>,
+        Option<String>,
+        OffsetDateTime,
+    );
     let rows: Vec<UsageRow> = sqlx::query_as(
         "SELECT id, project_id, service_id, notes, created_at
          FROM credential_usage WHERE item_id = $1 ORDER BY created_at DESC",
@@ -213,14 +218,12 @@ pub async fn delete_usage(
         _ => {}
     }
 
-    let result = sqlx::query(
-        "DELETE FROM credential_usage WHERE id = $1 AND item_id = $2",
-    )
-    .bind(usage_id)
-    .bind(item_id)
-    .execute(db)
-    .await
-    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let result = sqlx::query("DELETE FROM credential_usage WHERE id = $1 AND item_id = $2")
+        .bind(usage_id)
+        .bind(item_id)
+        .execute(db)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     if result.rows_affected() == 0 {
         return Err(ApiError::new(AppError::NotFound));
