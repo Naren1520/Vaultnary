@@ -26,7 +26,10 @@ const principles = [
 
 export default function SecurityOverviewPage() {
   return (
-    <PublicSiteLayout>
+    <PublicSiteLayout
+      title="Security"
+      description="Learn how Vaultnary protects sensitive credential fields with browser-side encryption and helps teams manage workspace access."
+    >
       <div className="security-page">
         <section className="security-hero">
           <div className="public-container">

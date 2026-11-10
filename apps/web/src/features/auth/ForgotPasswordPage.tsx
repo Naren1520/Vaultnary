@@ -29,7 +29,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthPageLayout>
+    <AuthPageLayout
+      title="Reset your password"
+      description="Request a secure password reset link for your Vaultnary account."
+    >
       {submitted ? (
         <div className="auth-login__form" aria-labelledby="reset-sent-title">
           <div className="auth-login__status-icon"><Check size={23} /></div>

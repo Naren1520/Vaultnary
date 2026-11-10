@@ -45,7 +45,10 @@ export default function ContactPage() {
   }
 
   return (
-    <PublicSiteLayout>
+    <PublicSiteLayout
+      title="Contact"
+      description="Contact Vaultnary with questions, account enquiries, product feedback, or partnership requests using our secure contact form."
+    >
       <div className="company-page">
         <section className="company-hero">
           <div className="public-container company-contact-hero">

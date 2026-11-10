@@ -1,0 +1,98 @@
+.security-mascot {
+  display: grid;
+  width: 200px;
+  height: 220px;
+  place-items: center;
+}
+
+.security-mascot__figure {
+  position: relative;
+  width: 160px;
+  height: 185px;
+  border-radius: 100px 100px 0 0;
+  background: #fff;
+}
+
+.security-mascot__figure::before,
+.security-mascot__figure::after {
+  position: absolute;
+  content: '';
+}
+
+.security-mascot__figure::before {
+  top: 0;
+  left: -20%;
+  width: 140%;
+  height: 125px;
+  background-image:
+    radial-gradient(circle, #fff 48%, transparent 50%),
+    radial-gradient(circle, #fff 48%, transparent 50%);
+  background-repeat: no-repeat;
+  background-size: 65px 65px;
+  background-position: 0 12px, 145px 12px;
+  animation: security-mascot-ears 3s linear infinite alternate;
+}
+
+.security-mascot__figure::after {
+  top: 25px;
+  left: 50%;
+  width: 100px;
+  height: 125px;
+  transform: translateX(-50%);
+  background-image:
+    radial-gradient(circle, #000 48%, transparent 55%),
+    radial-gradient(circle, #000 48%, transparent 55%),
+    radial-gradient(circle, #fff 30%, transparent 45%),
+    radial-gradient(circle, #000 48%, transparent 51%),
+    linear-gradient(#000 20px, transparent 0),
+    linear-gradient(#cfecf9 60px, transparent 0),
+    radial-gradient(circle, #cfecf9 50%, transparent 51%),
+    radial-gradient(circle, #cfecf9 50%, transparent 51%);
+  background-repeat: no-repeat;
+  background-size:
+    16px 16px,
+    16px 16px,
+    10px 10px,
+    42px 42px,
+    12px 3px,
+    50px 25px,
+    70px 70px,
+    70px 70px;
+  background-position:
+    25px 10px,
+    55px 10px,
+    36px 44px,
+    50% 30px,
+    50% 85px,
+    50% 50px,
+    50% 22px,
+    50% 45px;
+  animation: security-mascot-face 3s linear infinite alternate;
+}
+
+@keyframes security-mascot-face {
+  0% {
+    transform: translateX(-60%);
+  }
+
+  100% {
+    transform: translateX(-30%);
+  }
+}
+
+@keyframes security-mascot-ears {
+  0% {
+    transform: translateX(10px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .security-mascot__figure::before,
+  .security-mascot__figure::after {
+    animation: none;
+  }
+}

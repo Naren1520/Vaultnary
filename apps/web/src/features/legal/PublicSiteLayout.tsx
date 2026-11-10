@@ -2,9 +2,20 @@ import { ArrowRight } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import logoUrl from '../../assets/logo.png'
+import SiteMetadata from '../seo/SiteMetadata'
 import './legal.css'
 
-export default function PublicSiteLayout({ children }: { children: React.ReactNode }) {
+interface PublicSiteLayoutProps {
+  children: React.ReactNode
+  title?: string
+  description?: string
+}
+
+export default function PublicSiteLayout({
+  children,
+  title = 'Secure team credential manager',
+  description = 'Organize team passwords and credentials, manage access, and share sensitive values with care using Vaultnary.',
+}: PublicSiteLayoutProps) {
   const location = useLocation()
 
   useEffect(() => {
@@ -17,6 +28,7 @@ export default function PublicSiteLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="public-site">
+      <SiteMetadata title={title} description={description} />
       <a className="public-site__skip-link" href="#public-main">Skip to content</a>
       <header className="public-header">
         <div className="public-container public-header__inner">

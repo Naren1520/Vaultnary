@@ -21,7 +21,10 @@ export default function VerifyEmailPage() {
   }, [searchParams])
 
   return (
-    <AuthPageLayout>
+    <AuthPageLayout
+      title="Verify your email"
+      description="Verify the email address for your Vaultnary account."
+    >
       <div className="auth-login__form" aria-live="polite">
         {state === 'loading' && (
           <>

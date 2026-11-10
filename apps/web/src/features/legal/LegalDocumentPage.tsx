@@ -26,7 +26,7 @@ export default function LegalDocumentPage({
   sections,
 }: LegalDocumentPageProps) {
   return (
-    <PublicSiteLayout>
+    <PublicSiteLayout title={title} description={description}>
       <div className="legal-page">
         <div className="public-container">
           <Link className="legal-back-link" to="/">

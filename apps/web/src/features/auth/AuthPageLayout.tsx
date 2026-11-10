@@ -2,15 +2,19 @@ import type { ReactNode } from 'react'
 import { Fingerprint, KeyRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import logoUrl from '../../assets/logo.png'
+import SiteMetadata from '../seo/SiteMetadata'
 import AuthPattern from './AuthPattern'
 
 interface AuthPageLayoutProps {
   children: ReactNode
+  title: string
+  description: string
 }
 
-export default function AuthPageLayout({ children }: AuthPageLayoutProps) {
+export default function AuthPageLayout({ children, title, description }: AuthPageLayoutProps) {
   return (
     <main className="auth-page auth-page--login">
+      <SiteMetadata title={title} description={description} noIndex />
       <AuthPattern />
 
       <div className="auth-login">

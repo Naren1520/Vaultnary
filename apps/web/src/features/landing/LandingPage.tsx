@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Clock3,
   Eye,
-  Fingerprint,
   FolderKanban,
   KeyRound,
   LockKeyhole,
@@ -16,8 +15,10 @@ import {
 } from 'lucide-react'
 import logoUrl from '../../assets/logo.png'
 import LaptopCard from './components/LaptopCard'
+import SecurityMascot from './components/SecurityMascot'
 import VantaTopology from './components/VantaTopology'
 import WorkspacePreview from './components/WorkspacePreview'
+import SiteMetadata from '../seo/SiteMetadata'
 import './landing.css'
 
 const features = [
@@ -131,6 +132,10 @@ export default function LandingPage() {
 
   return (
     <div className="lp">
+      <SiteMetadata
+        title="Secure Team Password and Credential Manager"
+        description="Vaultnary helps teams organize shared passwords and credentials, manage workspace access, and protect sensitive vault fields with browser-side encryption."
+      />
       <header className={`lp-nav ${navSolid ? 'lp-nav--solid' : ''}`}>
         <div className="lp-container lp-nav__inner">
           <Link to="/" className="lp-brand" aria-label="Vaultnary home">
@@ -363,9 +368,7 @@ export default function LandingPage() {
         <section id="security" className="lp-security">
           <div className="lp-container lp-security__inner">
             <div className="lp-security__visual lp-reveal lp-reveal--zoom" aria-hidden="true">
-              <div className="lp-security__halo"><Fingerprint size={54} strokeWidth={1.2} /></div>
-              <span className="lp-security__orbit lp-security__orbit--one" />
-              <span className="lp-security__orbit lp-security__orbit--two" />
+              <SecurityMascot />
               <span className="lp-security__badge"><ShieldCheck size={17} /> Control stays with you</span>
             </div>
             <div className="lp-security__copy lp-reveal">

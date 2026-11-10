@@ -93,7 +93,10 @@ export default function SupportPage() {
     .filter((group) => group.questions.length > 0)
 
   return (
-    <PublicSiteLayout>
+    <PublicSiteLayout
+      title="Support and FAQs"
+      description="Get help with Vaultnary account access, password resets, vault recovery, team workspaces, credential sharing, and data requests."
+    >
       <div className="company-page company-support-page">
         <section className="company-hero company-support-hero">
           <div className="public-container">

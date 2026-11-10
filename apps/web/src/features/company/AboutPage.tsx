@@ -38,7 +38,10 @@ const steps = [
 
 export default function AboutPage() {
   return (
-    <PublicSiteLayout>
+    <PublicSiteLayout
+      title="About"
+      description="Learn how Vaultnary helps teams organize shared credentials, manage access, and protect sensitive vault fields."
+    >
       <div className="company-page company-about-page">
         <section className="company-hero company-about-hero">
           <div className="public-container company-about-hero__inner">

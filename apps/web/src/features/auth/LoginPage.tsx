@@ -67,7 +67,10 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthPageLayout>
+    <AuthPageLayout
+      title="Sign in"
+      description="Sign in to your Vaultnary account to access your team workspaces and credentials."
+    >
       <form
         onSubmit={handleSubmit}
         noValidate

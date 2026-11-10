@@ -51,7 +51,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthPageLayout>
+    <AuthPageLayout
+      title="Create your account"
+      description="Create a Vaultnary account to organize team credentials and manage shared access."
+    >
       {success ? (
         <div className="auth-login__form" aria-labelledby="register-success-title">
           <div className="auth-login__status-icon"><Check size={23} /></div>

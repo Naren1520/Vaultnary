@@ -1063,34 +1063,7 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   overflow: hidden;
   border: 1px solid #e8e8e6;
   border-radius: 12px;
-  background: #fafaf9;
-}
-
-.lp-security__halo {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  width: 118px;
-  height: 118px;
-  place-items: center;
-  border: 1px solid #e2e2e0;
-  border-radius: 50%;
-  color: #1a1a18;
-  background: #fff;
-}
-
-.lp-security__orbit {
-  position: absolute;
-  width: 230px;
-  height: 230px;
-  border: 1px solid #e2e2e0;
-  border-radius: 50%;
-}
-
-.lp-security__orbit--two {
-  width: 340px;
-  height: 340px;
-  border-color: #e9edf3;
+  background: #1a1a18;
 }
 
 .lp-security__badge {
