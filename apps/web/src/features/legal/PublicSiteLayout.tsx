@@ -4,8 +4,6 @@ import { useEffect } from 'react'
 import logoUrl from '../../assets/logo.png'
 import './legal.css'
 
-const privacyEmail = 'narensonu1520@gmail.com'
-
 export default function PublicSiteLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
 
@@ -45,17 +43,29 @@ export default function PublicSiteLayout({ children }: { children: React.ReactNo
               </Link>
               <p>A considered home for the credentials and access your team relies on.</p>
             </div>
-            <nav className="public-footer__column" aria-label="Explore">
+            <nav className="public-footer__column" aria-label="Explore Vaultnary">
               <h2>Explore</h2>
               <Link to="/#product">Product</Link>
               <Link to="/#workspaces">Workspaces</Link>
-              <Link to="/security">Security</Link>
+              <Link to="/#how-it-works">How it works</Link>
             </nav>
-            <nav className="public-footer__column" aria-label="Legal and account">
-              <h2>Information</h2>
+            <nav className="public-footer__column" aria-label="Account">
+              <h2>Account</h2>
+              <Link to="/login">Log in</Link>
+              <Link to="/register">Create an account</Link>
+              <Link to="/forgot-password">Reset password</Link>
+            </nav>
+            <nav className="public-footer__column" aria-label="Help and company">
+              <h2>Help &amp; company</h2>
+              <Link to="/about">About</Link>
+              <Link to="/support">Support</Link>
+              <Link to="/contact">Contact</Link>
+            </nav>
+            <nav className="public-footer__column" aria-label="Policies and security">
+              <h2>Policies</h2>
+              <Link to="/security">Security</Link>
               <Link to="/privacy">Privacy</Link>
               <Link to="/terms">Terms</Link>
-              <a href={`mailto:${privacyEmail}`}>Contact</a>
             </nav>
           </div>
           <div className="public-footer__bottom">

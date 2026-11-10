@@ -418,19 +418,24 @@ export default function LandingPage() {
               <a href="#product">Product</a>
               <a href="#workspaces">Workspaces</a>
               <a href="#how-it-works">How it works</a>
-              <a href="#security">Security</a>
             </nav>
             <nav className="lp-footer__column" aria-label="Your account">
               <h2>Account</h2>
               <Link to="/login">Log in</Link>
               <Link to="/register">Create an account</Link>
+              <Link to="/forgot-password">Reset password</Link>
             </nav>
-            <nav className="lp-footer__column" aria-label="Legal and security information">
-              <h2>Information</h2>
+            <nav className="lp-footer__column" aria-label="Help and company">
+              <h2>Help &amp; company</h2>
+              <Link to="/about">About</Link>
+              <Link to="/support">Support</Link>
+              <Link to="/contact">Contact</Link>
+            </nav>
+            <nav className="lp-footer__column" aria-label="Policies and security">
+              <h2>Policies</h2>
               <Link to="/security">Security</Link>
               <Link to="/privacy">Privacy</Link>
               <Link to="/terms">Terms</Link>
-              <a href="mailto:narensonu1520@gmail.com">Contact</a>
             </nav>
           </div>
           <div className="lp-footer__bottom">

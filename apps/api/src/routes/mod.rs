@@ -3,12 +3,15 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+use std::time::Duration;
 
+use crate::middleware::rate_limit::{InMemoryStore, RateLimitConfig, RateLimitLayer};
 use crate::state::AppState;
 
 pub mod audit;
 pub mod auth;
 pub mod credentials;
+pub mod contact;
 pub mod hierarchy;
 pub mod projects;
 pub mod recovery;
@@ -28,6 +31,16 @@ pub fn api_router() -> Router<AppState> {
 
 fn v1_routes() -> Router<AppState> {
     Router::new()
+        .route(
+            "/contact",
+            post(contact::submit).layer(RateLimitLayer::new(
+                InMemoryStore::new(),
+                RateLimitConfig {
+                    window: Duration::from_secs(60),
+                    max_requests: 5,
+                },
+            )),
+        )
         // --- Auth ---
         .route("/auth/register", post(auth::register))
         .route("/auth/verify-email", get(auth::verify_email))

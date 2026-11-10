@@ -1191,8 +1191,8 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
 
 .lp-footer__top {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(110px, 0.55fr));
-  gap: 3rem;
+  grid-template-columns: minmax(0, 1.3fr) repeat(4, minmax(0, 0.7fr));
+  gap: 2rem;
   padding-bottom: 3rem;
   border-bottom: 1px solid #3a3a37;
 }
@@ -1464,8 +1464,8 @@ body.lp-hide-scrollbar::-webkit-scrollbar {
   }
 
   .lp-footer__top {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.5rem 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem 1.5rem;
   }
 
   .lp-footer__brand-block {

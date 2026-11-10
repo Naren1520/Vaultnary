@@ -1,0 +1,39 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { ArrowRight, Eye, FolderKanban, KeyRound, LockKeyhole, ShieldCheck, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import PublicSiteLayout from '../legal/PublicSiteLayout';
+import './company.css';
+const principles = [
+    {
+        icon: LockKeyhole,
+        number: '01',
+        title: 'Privacy comes first',
+        body: 'Sensitive vault fields are encrypted in your browser before they are stored. Your secrets should stay yours—not become readable just because they’re useful.',
+    },
+    {
+        icon: Users,
+        number: '02',
+        title: 'Sharing should be intentional',
+        body: 'Invite people into the right workspace and grant only the access they need. Clear permissions make teamwork easier to understand and manage.',
+    },
+    {
+        icon: FolderKanban,
+        number: '03',
+        title: 'Context makes work clearer',
+        body: 'Connect credentials to workspaces, projects, and services, so important access details are easier to find and maintain.',
+    },
+    {
+        icon: Eye,
+        number: '04',
+        title: 'Visibility builds confidence',
+        body: 'Security sessions and audit activity help teams review access and understand important changes over time.',
+    },
+];
+const steps = [
+    { icon: Users, title: 'Bring the team together', body: 'Create a workspace for the people who need to coordinate access.' },
+    { icon: KeyRound, title: 'Keep credentials in context', body: 'Organize account details around the projects and services they support.' },
+    { icon: ShieldCheck, title: 'Share with care', body: 'Manage membership and permissions as people and projects change.' },
+];
+export default function AboutPage() {
+    return (_jsx(PublicSiteLayout, { children: _jsxs("div", { className: "company-page company-about-page", children: [_jsx("section", { className: "company-hero company-about-hero", children: _jsxs("div", { className: "public-container company-about-hero__inner", children: [_jsxs("div", { children: [_jsx("p", { className: "legal-eyebrow", children: "A better home for team access" }), _jsx("h1", { children: "Make the important things easier to find\u2014and safer to share." }), _jsx("p", { children: "Vaultnary helps teams bring credentials, people, and projects together in one considered workspace. Less time searching. More clarity about who has access and why." }), _jsxs("div", { className: "company-about-hero__actions", children: [_jsxs(Link, { className: "public-button", to: "/register", children: ["Create your workspace ", _jsx(ArrowRight, { size: 16, "aria-hidden": "true" })] }), _jsx(Link, { className: "company-text-link", to: "/security", children: "Explore our security approach" })] })] }), _jsxs("div", { className: "company-about-visual", role: "img", "aria-label": "A workspace connecting people, projects, and credentials", children: [_jsx("div", { className: "company-about-visual__ring company-about-visual__ring--outer" }), _jsx("div", { className: "company-about-visual__ring company-about-visual__ring--inner" }), _jsxs("div", { className: "company-about-visual__center", children: [_jsx(LockKeyhole, { size: 27, "aria-hidden": "true" }), _jsx("span", { children: "Vaultnary" })] }), _jsxs("span", { className: "company-about-visual__node company-about-visual__node--people", children: [_jsx(Users, { size: 18, "aria-hidden": "true" }), _jsx("span", { children: "People" })] }), _jsxs("span", { className: "company-about-visual__node company-about-visual__node--projects", children: [_jsx(FolderKanban, { size: 18, "aria-hidden": "true" }), _jsx("span", { children: "Projects" })] }), _jsxs("span", { className: "company-about-visual__node company-about-visual__node--keys", children: [_jsx(KeyRound, { size: 18, "aria-hidden": "true" }), _jsx("span", { children: "Credentials" })] })] })] }) }), _jsxs("section", { className: "company-about-intro public-container", children: [_jsx("p", { className: "legal-eyebrow", children: "Why Vaultnary" }), _jsxs("div", { children: [_jsx("h2", { children: "Access is part of the work. Managing it shouldn\u2019t get in the way." }), _jsxs("div", { children: [_jsx("p", { children: "Teams depend on credentials every day, but access details can end up scattered across chats, notes, and personal handoffs. That makes it harder to find the right account, onboard a teammate, or know who still needs access." }), _jsx("p", { children: "Vaultnary gives teams a shared place to organize that work. It brings practical structure together with browser-side encryption for sensitive fields and clear controls for workspace membership and credential sharing." })] })] })] }), _jsx("section", { className: "company-about-principles", children: _jsxs("div", { className: "public-container", children: [_jsxs("div", { className: "company-section-heading", children: [_jsx("p", { className: "legal-eyebrow", children: "What we believe" }), _jsx("h2", { children: "Thoughtful details make a better way to work." })] }), _jsx("div", { className: "company-about-principle-grid", children: principles.map(({ icon: Icon, number, title, body }) => (_jsxs("article", { className: "company-about-principle", children: [_jsxs("div", { className: "company-about-principle__top", children: [_jsx("span", { className: "company-card__icon", children: _jsx(Icon, { size: 20, "aria-hidden": "true" }) }), _jsx("span", { children: number })] }), _jsx("h3", { children: title }), _jsx("p", { children: body })] }, number))) })] }) }), _jsxs("section", { className: "company-about-how public-container", children: [_jsxs("div", { className: "company-section-heading", children: [_jsx("p", { className: "legal-eyebrow", children: "A calmer way to manage access" }), _jsx("h2", { children: "From scattered details to shared understanding." })] }), _jsx("div", { className: "company-about-steps", children: steps.map(({ icon: Icon, title, body }, index) => (_jsxs("article", { className: "company-about-step", children: [_jsxs("span", { className: "company-about-step__number", children: ["0", index + 1] }), _jsx("span", { className: "company-about-step__icon", children: _jsx(Icon, { size: 20, "aria-hidden": "true" }) }), _jsx("h3", { children: title }), _jsx("p", { children: body })] }, title))) })] }), _jsx("section", { className: "company-about-transparency", children: _jsxs("div", { className: "public-container company-about-transparency__inner", children: [_jsxs("div", { children: [_jsx("p", { className: "legal-eyebrow", children: "Clear about how it works" }), _jsx("h2", { children: "Security deserves specifics, not slogans." })] }), _jsxs("div", { children: [_jsx("p", { children: "Vaultnary\u2019s security page explains what the current design protects, what remains operational metadata, and the practical steps you can take to protect your account. We don\u2019t claim independent certification." }), _jsxs(Link, { to: "/security", children: ["Read the security overview ", _jsx(ArrowRight, { size: 15, "aria-hidden": "true" })] })] })] }) }), _jsxs("section", { className: "company-about-cta public-container", children: [_jsxs("div", { children: [_jsx("p", { className: "legal-eyebrow", children: "Get to know Vaultnary" }), _jsx("h2", { children: "Good access starts with a little more clarity." }), _jsx("p", { children: "Explore the product, get help, or tell us what your team needs." })] }), _jsxs("div", { children: [_jsxs(Link, { className: "public-button", to: "/register", children: ["Get started ", _jsx(ArrowRight, { size: 16, "aria-hidden": "true" })] }), _jsx(Link, { className: "company-text-link", to: "/contact", children: "Talk to us" }), _jsx(Link, { className: "company-text-link", to: "/support", children: "Visit support" })] })] })] }) }));
+}
