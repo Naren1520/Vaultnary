@@ -24,6 +24,7 @@ interface DataTableProps<T> {
   emptyState?: React.ReactNode
   selectedKey?: string
   caption?: string
+  className?: string
 }
 
 /**
@@ -37,6 +38,7 @@ export default function DataTable<T>({
   emptyState,
   selectedKey,
   caption,
+  className,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<SortState | null>(null)
 
@@ -51,7 +53,7 @@ export default function DataTable<T>({
   }
 
   return (
-    <div className="data-table-scroll" style={{ overflowX: 'auto', width: '100%' }}>
+    <div className={['data-table-scroll', className].filter(Boolean).join(' ')} style={{ width: '100%' }}>
       <table
         style={{
           width: '100%',
@@ -150,6 +152,7 @@ export default function DataTable<T>({
                   {columns.map((col) => (
                     <td
                       key={col.key}
+                      data-label={col.header}
                       style={{
                         padding: 'var(--space-3)',
                         verticalAlign: 'middle',

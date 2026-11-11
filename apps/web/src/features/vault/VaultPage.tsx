@@ -164,7 +164,7 @@ export default function VaultPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="vault-page-content" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }}>
           <header className="app-page-heading">
             <p className="app-page-heading__eyebrow">Private by design</p>
@@ -184,6 +184,7 @@ export default function VaultPage() {
       {showCreate && (
         <div
           role="presentation"
+          className="app-modal-overlay"
           onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}
           style={{
             position: 'fixed',
@@ -198,6 +199,7 @@ export default function VaultPage() {
           }}
         >
           <div
+            className="app-modal-panel"
             style={{
               backgroundColor: 'var(--color-bg)',
               border: 'var(--border-card)',

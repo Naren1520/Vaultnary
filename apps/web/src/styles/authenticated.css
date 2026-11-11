@@ -222,6 +222,46 @@
   .app-sidebar {
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(16px);
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .app-sidebar nav {
+    display: flex;
+    min-height: 0;
+  }
+
+  .sidebar-mobile-nav {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.35rem;
+    padding-inline: 0.45rem;
+  }
+
+  .sidebar-scroll-button {
+    width: 2rem;
+    height: 2rem;
+    flex-basis: 2rem;
+    flex-shrink: 0;
+    border-color: #e4e9f1;
+    background: #fff;
+  }
+
+  .sidebar-links {
+    min-width: 0;
+    flex: 1 1 0;
+    padding-inline: 0.1rem;
+  }
+
+  .sidebar-links li,
+  .sidebar-link {
+    min-width: 4.1rem;
+    flex-basis: 4.1rem;
+  }
+
+  .sidebar-link {
+    min-height: 3.25rem;
+    padding-inline: 0.2rem;
   }
 
   .sidebar-link[aria-current="page"]::before {
@@ -232,6 +272,146 @@
     width: auto;
     height: 2px;
     border-radius: 0 0 3px 3px;
+  }
+
+  .app-topbar {
+    position: relative;
+    top: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+    padding: 0.75rem 1rem;
+    backdrop-filter: none;
+  }
+
+  .topbar-breadcrumbs,
+  .topbar-search,
+  .topbar-actions {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .global-search {
+    width: 100%;
+  }
+
+  .app-page-content {
+    padding: 1rem !important;
+  }
+
+  .vault-page-content {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .vault-page-content > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .vault-page-content > div:first-child > div {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .data-table-scroll {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 0.85rem;
+  }
+
+  .data-table-scroll table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .data-table-scroll thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .data-table-scroll tbody tr {
+    display: block;
+    padding: 0.45rem 0.85rem;
+    border-bottom: 1px solid #e8ebf0;
+  }
+
+  .data-table-scroll tbody td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.65rem;
+    padding: 0.55rem 0 !important;
+    border: 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .data-table-scroll tbody td::before {
+    color: #788397;
+    content: attr(data-label);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.045em;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+
+  .data-table-scroll tbody td[colspan] {
+    display: block;
+    padding: 0.65rem !important;
+  }
+
+  .data-table-scroll tbody td[colspan]::before {
+    content: none;
+  }
+
+  .data-table-scroll .app-empty-state {
+    min-height: 0;
+    width: 100%;
+    gap: 0.75rem;
+    padding: 1.35rem 0.8rem;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table-scroll .app-empty-state__message {
+    width: 100%;
+  }
+
+  .app-create-form {
+    width: 100%;
+    min-width: 0;
+    padding: 0.85rem;
+  }
+
+  .app-create-form > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .vault-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .vault-actions > button {
+    min-width: 0;
+    padding-inline: 0.55rem !important;
+    white-space: nowrap;
+  }
+
+  .app-empty-state {
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 

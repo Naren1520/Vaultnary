@@ -6,6 +6,7 @@ mod error;
 mod middleware;
 mod routes;
 mod state;
+mod time_format;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

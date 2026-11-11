@@ -76,15 +76,17 @@ pub async fn list_events(
 
     let events: Vec<EventItem> = rows
         .into_iter()
-        .map(|(id, at, rid, rt, ip, ca)| EventItem {
-            id,
-            action_type: at,
-            resource_id: rid,
-            resource_type: rt,
-            ip_address: ip,
-            created_at: ca.to_string(),
+        .map(|(id, at, rid, rt, ip, ca)| {
+            Ok(EventItem {
+                id,
+                action_type: at,
+                resource_id: rid,
+                resource_type: rt,
+                ip_address: ip,
+                created_at: crate::time_format::format_timestamp(ca)?,
+            })
         })
-        .collect();
+        .collect::<Result<_, ApiError>>()?;
 
     Ok(Json(serde_json::json!({ "data": events })))
 }

@@ -96,7 +96,7 @@ export default function VaultList({ onCreateCredential }: VaultListProps) {
   if (error) return <p style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }}>{error}</p>
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
+    <div className="vault-list-content" style={{ display: 'grid', gap: '1rem' }}>
       <label htmlFor="vault-local-search" className="sr-only">Search unlocked credentials</label>
       <input
         id="vault-local-search"
@@ -124,6 +124,7 @@ export default function VaultList({ onCreateCredential }: VaultListProps) {
         getRowKey={(r) => r.id}
         onRowClick={(r) => navigate(`/app/vault/${r.id}`)}
         caption="Vault credentials"
+        className="vault-credential-table"
         emptyState={
           <EmptyState
             title={query ? 'No matching credentials' : 'Your vault is empty'}

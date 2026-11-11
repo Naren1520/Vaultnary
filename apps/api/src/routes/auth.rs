@@ -548,18 +548,20 @@ pub async fn list_sessions(
 
     let sessions: Vec<SessionRecord> = rows
         .into_iter()
-        .map(
-            |(id, created_at, last_used_at, expires_at, ip, ua, fp)| SessionRecord {
+        .map(|(id, created_at, last_used_at, expires_at, ip, ua, fp)| {
+            Ok(SessionRecord {
                 id,
-                created_at: created_at.to_string(),
-                last_used_at: last_used_at.map(|t| t.to_string()),
-                expires_at: expires_at.to_string(),
+                created_at: crate::time_format::format_timestamp(created_at)?,
+                last_used_at: last_used_at
+                    .map(crate::time_format::format_timestamp)
+                    .transpose()?,
+                expires_at: crate::time_format::format_timestamp(expires_at)?,
                 ip_address: ip,
                 user_agent: ua,
                 device_fingerprint: fp,
-            },
-        )
-        .collect();
+            })
+        })
+        .collect::<Result<_, ApiError>>()?;
 
     Ok(Json(serde_json::json!({ "data": sessions })))
 }

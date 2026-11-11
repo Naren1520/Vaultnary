@@ -45,6 +45,14 @@
   text-decoration: none;
 }
 
+.sidebar-mobile-nav {
+  display: contents;
+}
+
+.sidebar-scroll-button {
+  display: none;
+}
+
 .app-main {
   display: flex;
   min-width: 0;
@@ -140,6 +148,10 @@
 }
 
 @media (max-width: 760px) {
+  :root {
+    --mobile-nav-height: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
   .app-shell {
     display: block;
     min-height: 100vh;
@@ -151,10 +163,10 @@
     z-index: 100;
     inset: auto 0 0;
     width: 100%;
-    height: calc(3.75rem + env(safe-area-inset-bottom));
-    min-height: 0;
-    flex-direction: row;
-    padding: var(--space-1) 0 calc(var(--space-1) + env(safe-area-inset-bottom));
+    height: auto;
+    min-height: var(--mobile-nav-height);
+    flex-direction: column;
+    padding: 0.3rem 0 calc(0.3rem + env(safe-area-inset-bottom));
     border: 0;
     border-top: var(--border-card);
   }
@@ -163,18 +175,52 @@
     display: none;
   }
 
+  .sidebar-section-label {
+    display: none;
+  }
+
   .app-sidebar nav {
     min-width: 0;
     width: 100%;
+    min-height: 3.25rem;
+  }
+
+  .sidebar-mobile-nav {
+    display: flex;
+    width: 100%;
+    min-height: 3.25rem;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .sidebar-scroll-button {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 2rem;
+    place-items: center;
+    border: 1px solid #e6eaf0;
+    border-radius: 0.65rem;
+    background: white;
+    color: #334155;
+  }
+
+  .sidebar-scroll-button:disabled {
+    opacity: 0.35;
   }
 
   .sidebar-links {
-    height: 100%;
+    min-width: 0;
+    min-height: 3.25rem;
+    flex: 1;
     flex-direction: row;
-    gap: 0;
+    align-items: stretch;
+    gap: 0.3rem;
     overflow-x: auto;
+    overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
+    scroll-behavior: smooth;
   }
 
   .sidebar-links::-webkit-scrollbar {
@@ -182,25 +228,31 @@
   }
 
   .sidebar-links li {
-    flex: 0 0 auto;
+    min-width: 4.5rem;
+    flex: 0 0 4.5rem;
+    display: flex;
   }
 
   .sidebar-link {
-    min-width: 3rem;
-    height: 100%;
+    min-width: 4.5rem;
+    min-height: 3.25rem;
+    height: auto;
+    flex: 1;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
-    margin-inline: 2px;
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--text-xs) !important;
+    gap: 0.1rem;
+    margin: 0;
+    padding: 0.2rem 0.15rem;
+    font-size: 0.64rem !important;
+    line-height: 1.15;
     white-space: nowrap;
+    text-align: center;
   }
 
   .app-main {
     min-height: 100vh;
     min-height: 100dvh;
-    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));
+    padding-bottom: var(--mobile-nav-height);
   }
 
   .app-topbar {
@@ -220,11 +272,63 @@
   .topbar-actions {
     flex: 1 1 100%;
     max-width: 100%;
-    justify-content: flex-end;
+    justify-content: stretch;
+  }
+
+  .topbar-search,
+  .global-search {
+    width: 100%;
+    flex: 1 1 100%;
   }
 
   .audit-filter {
     flex-wrap: wrap;
+  }
+
+  .app-inspector {
+    display: none;
+  }
+
+  .app-page-content {
+    min-width: 0;
+  }
+
+  .app-create-form {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-create-form > * {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .vault-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vault-actions > button {
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .vault-actions > button:last-of-type {
+    grid-column: 1 / -1;
+  }
+
+  .app-modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .app-modal-panel {
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+    border-radius: 1rem 1rem 0 0 !important;
+    padding: 1.25rem !important;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom)) !important;
   }
 }
 
@@ -239,8 +343,8 @@
     padding-inline: var(--space-2);
   }
 
-  .vault-actions {
-    flex-wrap: wrap;
+  .app-page-heading {
+    margin-bottom: 1.1rem;
   }
 
   .audit-filter {
@@ -251,5 +355,39 @@
 
   .audit-filter-input {
     width: 100%;
+  }
+
+  .app-empty-state {
+    min-height: 12rem;
+    padding: 1.25rem 0.8rem;
+  }
+
+}
+
+@media (max-height: 560px) and (max-width: 760px) {
+  :root {
+    --mobile-nav-height: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+
+  .app-sidebar {
+    min-height: var(--mobile-nav-height);
+    padding-top: 0.25rem;
+    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+  }
+
+  .app-sidebar nav,
+  .sidebar-mobile-nav,
+  .sidebar-links,
+  .sidebar-link {
+    min-height: 3rem;
+  }
+
+  .sidebar-link svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .app-main {
+    padding-bottom: var(--mobile-nav-height);
   }
 }
