@@ -26,6 +26,7 @@ Vaultnary uses PostgreSQL 16 with sequential SQL migrations. All tables use UUID
 | 013_archive_audit_actions.sql | Archive audit actions |
 | 014_email_outbox.sql | `email_outbox` |
 | 015_account_audit_purge.sql | Narrowly scoped audit-event purge function for account deletion |
+| 016_vault_key_material.sql | Encrypted vault private-key material and encrypted credential metadata |
 
 ---
 

@@ -47,7 +47,7 @@ export default function VaultPage() {
     setArchiveNotice('')
     try {
       const response = await apiPost<{ data: VaultArchive }>('/api/v1/vault/export')
-      if (!response.data || response.data.version !== 1) {
+      if (!response.data || response.data.version !== 2) {
         throw new Error('The server returned an invalid vault archive.')
       }
       const blob = new Blob([JSON.stringify(response.data, null, 2)], {
@@ -166,7 +166,12 @@ export default function VaultPage() {
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }}>
-          <VaultList key={listKey} />
+          <header className="app-page-heading">
+            <p className="app-page-heading__eyebrow">Private by design</p>
+            <h1>Your vault</h1>
+            <p>Your encrypted credentials, ready when you need them.</p>
+          </header>
+          <VaultList key={listKey} onCreateCredential={() => setShowCreate(true)} />
         </div>
         <Inspector>
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

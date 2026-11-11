@@ -205,6 +205,7 @@ export default function WorkspacesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar breadcrumbs={[{ label: 'Workspaces', href: '/app/workspaces' }]} />
       <main
+        className="app-page-content"
         style={{
           padding: 'var(--space-4)',
           overflowY: 'auto',
@@ -217,6 +218,7 @@ export default function WorkspacesPage() {
       >
         <section
           aria-labelledby="workspace-list-heading"
+          className="app-page-section"
           style={{ border: 'var(--border-card)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}
         >
           <h1 id="workspace-list-heading" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>
@@ -284,6 +286,7 @@ export default function WorkspacesPage() {
 
         <section
           aria-labelledby="workspace-details-heading"
+          className="app-page-section"
           style={{ border: 'var(--border-card)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}
         >
           <h2 id="workspace-details-heading" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>

@@ -45,8 +45,12 @@ export default function SecurityCenterPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Topbar breadcrumbs={[{ label: 'Security Center', href: '/app/security' }]} />
-      <div style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
-        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-4)' }}>Active Sessions</h2>
+      <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
+        <header className="app-page-heading">
+          <p className="app-page-heading__eyebrow">Account protection</p>
+          <h1>Active sessions</h1>
+          <p>Review devices signed in to your account and revoke access you no longer recognize.</p>
+        </header>
         {loading
           ? <SkeletonLoader variant="table-row" rows={4} />
           : <DataTable columns={columns} rows={sessions} getRowKey={(r) => r.id} caption="Active sessions" emptyState={<EmptyState title="No active sessions" />} />}

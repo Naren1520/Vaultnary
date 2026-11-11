@@ -48,6 +48,10 @@ struct VaultItemMeta {
     updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     inherited_from: Option<InheritedFrom>,
+    encrypted_metadata: Option<String>,
+    encrypted_payload: Option<String>,
+    encrypted_dek: Option<String>,
+    metadata_locked: bool,
 }
 
 #[derive(Serialize)]
@@ -67,25 +71,17 @@ pub(super) struct VaultArchive {
 #[serde(deny_unknown_fields)]
 pub(super) struct ArchiveItem {
     id: Uuid,
-    name: String,
-    credential_type: String,
     parent_item_id: Option<Uuid>,
-    tags: Vec<String>,
-    notes: Option<String>,
+    encrypted_metadata: Option<String>,
     encrypted_payload: Option<String>,
-    payload_metadata: Option<serde_json::Value>,
     encrypted_dek: Option<String>,
 }
 
 struct ValidatedArchiveItem {
     id: Uuid,
-    name: String,
-    credential_type: String,
     parent_item_id: Option<Uuid>,
-    tags: Vec<String>,
-    notes: Option<String>,
+    encrypted_metadata: Option<Vec<u8>>,
     encrypted_payload: Option<Vec<u8>>,
-    payload_metadata: Option<serde_json::Value>,
     encrypted_dek: Option<Vec<u8>>,
 }
 
@@ -115,99 +111,56 @@ async fn insert_audit(
 
 /* Input validation helpers                                            */
 
-fn validate_item_fields(body: &serde_json::Value) -> Result<(), ApiError> {
-    let mut details = vec![];
-
-    /* name */
-    let name = body.get("name").and_then(|v| v.as_str()).unwrap_or("");
-    if name.is_empty() || name.len() > MAX_NAME_LEN {
-        details.push(ErrorDetail {
-            field: "name".into(),
-            rule: "length_1_255".into(),
-        });
+fn validate_encrypted_item_fields(
+    body: &serde_json::Value,
+    require_encrypted_dek: bool,
+) -> Result<(), ApiError> {
+    let mut errors = Vec::new();
+    for (field, min, max) in [
+        ("encrypted_metadata", 29, MAX_PAYLOAD_BYTES),
+        ("encrypted_payload", 29, MAX_PAYLOAD_BYTES),
+    ] {
+        let encoded = body.get(field).and_then(|value| value.as_str()).unwrap_or("");
+        match decode_base64_or_hex(encoded) {
+            Some(bytes) if (min..=max).contains(&bytes.len()) => {}
+            _ => errors.push(ErrorDetail {
+                field: field.into(),
+                rule: "invalid_encrypted_length_or_encoding".into(),
+            }),
+        }
     }
-
-    /* credential_type */
-    let ctype_str = body
-        .get("credential_type")
-        .and_then(|v| v.as_str())
+    let encoded_dek = body
+        .get("encrypted_dek")
+        .and_then(|value| value.as_str())
         .unwrap_or("");
-    if CredentialType::from_str(ctype_str).is_none() {
-        details.push(ErrorDetail {
-            field: "credential_type".into(),
-            rule: "invalid_enum".into(),
-        });
-    }
-
-    /* tags */
-    if let Some(tags_val) = body.get("tags") {
-        if let Some(arr) = tags_val.as_array() {
-            if arr.len() > MAX_TAG_COUNT {
-                details.push(ErrorDetail {
-                    field: "tags".into(),
-                    rule: "max_20".into(),
-                });
-            }
-            for tag in arr {
-                let s = tag.as_str().unwrap_or("");
-                if s.is_empty() || s.len() > MAX_TAG_LEN {
-                    details.push(ErrorDetail {
-                        field: "tags".into(),
-                        rule: "each_max_50_chars".into(),
-                    });
-                    break;
-                }
-            }
+    if require_encrypted_dek || !encoded_dek.is_empty() {
+        match decode_base64_or_hex(encoded_dek) {
+            Some(bytes) if bytes.len() == 512 => {}
+            _ => errors.push(ErrorDetail {
+                field: "encrypted_dek".into(),
+                rule: "invalid_encrypted_length_or_encoding".into(),
+            }),
         }
     }
-
-    /* encrypted_payload size */
-    if let Some(ep) = body.get("encrypted_payload") {
-        let len = ep.as_str().map(|s| s.len()).unwrap_or(0);
-        if len > MAX_PAYLOAD_BYTES {
-            details.push(ErrorDetail {
-                field: "encrypted_payload".into(),
-                rule: "max_65536_bytes".into(),
+    if let Some(parent_id) = body.get("parent_item_id") {
+        if !parent_id.is_null()
+            && parent_id
+                .as_str()
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .is_none()
+        {
+            errors.push(ErrorDetail {
+                field: "parent_item_id".into(),
+                rule: "invalid_uuid".into(),
             });
         }
     }
-
-    /* notes */
-    if let Some(notes) = body.get("notes").and_then(|v| v.as_str()) {
-        if notes.len() > MAX_NOTES_LEN {
-            details.push(ErrorDetail {
-                field: "notes".into(),
-                rule: "max_10000_chars".into(),
-            });
-        }
-    }
-
-    if !details.is_empty() {
+    if !errors.is_empty() {
         return Err(ApiError::with_details(
-            AppError::UnprocessableEntity("Validation failed".into()),
-            details,
+            AppError::UnprocessableEntity("Invalid encrypted credential.".into()),
+            errors,
         ));
     }
-
-    /* Per-type payload_metadata validation (only when metadata is provided) */
-    if let Some(ct) = CredentialType::from_str(ctype_str) {
-        if let Some(meta) = body.get("payload_metadata") {
-            if let Err(missing) = validate_payload_metadata(&ct, meta) {
-                let det: Vec<ErrorDetail> = missing
-                    .into_iter()
-                    .map(|f| ErrorDetail {
-                        field: format!("payload_metadata.{f}"),
-                        rule: "required".into(),
-                    })
-                    .collect();
-                return Err(ApiError::with_details(
-                    AppError::UnprocessableEntity("Missing required metadata fields".into()),
-                    det,
-                ));
-            }
-        }
-    }
-
     Ok(())
 }
 
@@ -218,29 +171,29 @@ pub async fn create_item(
     Extension(auth): Extension<AuthUser>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    validate_item_fields(&body)?;
-
-    let name = body["name"].as_str().unwrap().trim().to_string();
-    let ctype_str = body["credential_type"].as_str().unwrap();
+    validate_encrypted_item_fields(&body, true)?;
     let parent_item_id: Option<Uuid> = body
         .get("parent_item_id")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok());
-    let tags: Vec<String> = body
-        .get("tags")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|t| t.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
     let encrypted_payload: Option<&str> = body.get("encrypted_payload").and_then(|v| v.as_str());
-    let payload_metadata: Option<&serde_json::Value> = body.get("payload_metadata");
-    let notes: Option<&str> = body.get("notes").and_then(|v| v.as_str());
+    let encrypted_metadata: Option<&str> =
+        body.get("encrypted_metadata").and_then(|v| v.as_str());
     let encrypted_dek: Option<&str> = body.get("encrypted_dek").and_then(|v| v.as_str());
 
     let db = state.db();
+
+    let key_material_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM vault_key_material WHERE user_id = $1)")
+            .bind(auth.user_id)
+            .fetch_one(db)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    if !key_material_exists {
+        return Err(ApiError::new(AppError::Conflict(
+            "Initialize and unlock your encrypted vault before adding credentials.".into(),
+        )));
+    }
 
     /* Verify the user owns a vault */
     let vault: Option<(Uuid,)> =
@@ -257,6 +210,8 @@ pub async fn create_item(
     let item_id = Uuid::new_v4();
     let encrypted_payload_bytes: Option<Vec<u8>> =
         encrypted_payload.map(|s| decode_base64_or_hex(s)).flatten();
+    let encrypted_metadata_bytes: Option<Vec<u8>> =
+        encrypted_metadata.map(decode_base64_or_hex).flatten();
     let encrypted_dek_bytes: Option<Vec<u8>> = encrypted_dek.and_then(decode_base64_or_hex);
 
     let now = OffsetDateTime::now_utc();
@@ -270,18 +225,14 @@ pub async fn create_item(
     sqlx::query(
         "INSERT INTO vault_items
          (id, vault_id, name, credential_type, parent_item_id, tags, encrypted_payload,
-          payload_metadata, notes, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)",
+          payload_metadata, notes, encrypted_metadata, created_at, updated_at)
+         VALUES ($1, $2, 'Encrypted credential', 'custom', $3, '{}', $4, NULL, NULL, $5, $6, $6)",
     )
     .bind(item_id)
     .bind(vault_id)
-    .bind(&name)
-    .bind(ctype_str)
     .bind(parent_item_id)
-    .bind(&tags as &[String])
-    .bind(encrypted_payload_bytes)
-    .bind(payload_metadata)
-    .bind(notes)
+    .bind(encrypted_payload_bytes.clone())
+    .bind(encrypted_metadata_bytes.clone())
     .bind(now)
     .execute(&mut *tx)
     .await
@@ -300,21 +251,23 @@ pub async fn create_item(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    /* Store key envelope if encrypted_dek provided */
-    if let Some(dek) = encrypted_dek_bytes {
-        sqlx::query(
-            "INSERT INTO credential_key_envelopes (id, item_id, user_id, encrypted_dek, created_at)
-             VALUES ($1, $2, $3, $4, $5)",
-        )
-        .bind(Uuid::new_v4())
-        .bind(item_id)
-        .bind(auth.user_id)
-        .bind(dek)
-        .bind(now)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-    }
+    let dek = encrypted_dek_bytes.ok_or_else(|| {
+        ApiError::new(AppError::UnprocessableEntity(
+            "The credential encryption key is required.".into(),
+        ))
+    })?;
+    sqlx::query(
+        "INSERT INTO credential_key_envelopes (id, item_id, user_id, encrypted_dek, created_at)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(item_id)
+    .bind(auth.user_id)
+    .bind(dek.clone())
+    .bind(now)
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     tx.commit()
         .await
@@ -326,23 +279,27 @@ pub async fn create_item(
         "item.created",
         Some(item_id),
         Some("vault_item"),
-        serde_json::json!({ "name": name, "credential_type": ctype_str }),
+        serde_json::json!({ "metadata_encrypted": true }),
     )
     .await;
 
     let meta = VaultItemMeta {
         id: item_id,
-        name,
-        credential_type: ctype_str.to_string(),
+        name: "Encrypted credential".into(),
+        credential_type: "custom".into(),
         parent_item_id,
-        tags,
-        notes: notes.map(String::from),
+        tags: Vec::new(),
+        notes: None,
         payload_metadata: None,
         is_favorite: false,
         last_accessed_at: None,
         created_at: now.to_string(),
         updated_at: now.to_string(),
         inherited_from: None,
+        encrypted_metadata: encrypted_metadata_bytes.map(hex::encode),
+        encrypted_payload: encrypted_payload_bytes.map(hex::encode),
+        encrypted_dek: Some(hex::encode(dek)),
+        metadata_locked: true,
     };
 
     Ok((
@@ -368,28 +325,28 @@ pub async fn list_items(
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT).max(1);
     let db = state.db();
 
-    /* Rows: (id, name, ctype, parent_item_id, tags JSON, notes, is_favorite,
-    last_accessed_at, created_at, updated_at) */
+    /* List responses expose ciphertext only; credential labels are decrypted in the browser. */
     type ItemRow = (
         Uuid,
-        String,
-        String,
         Option<Uuid>,
-        Vec<String>,
-        Option<String>,
         bool,
         Option<OffsetDateTime>,
         OffsetDateTime,
         OffsetDateTime,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
     );
 
     let rows: Vec<ItemRow> = if let Some(cursor) = params.cursor {
         sqlx::query_as(
-            "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                    vi.tags, vi.notes, COALESCE(cp.is_favorite, false),
-                    vi.last_accessed_at, vi.created_at, vi.updated_at
+            "SELECT vi.id, vi.parent_item_id, COALESCE(cp.is_favorite, false),
+                    vi.last_accessed_at, vi.created_at, vi.updated_at,
+                    vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
              FROM vault_items vi
              JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+             LEFT JOIN credential_key_envelopes cke
+               ON cke.item_id = vi.id AND cke.user_id = $1
              WHERE vi.created_at < (SELECT created_at FROM vault_items WHERE id = $2)
              ORDER BY vi.created_at DESC
              LIMIT $3",
@@ -402,11 +359,13 @@ pub async fn list_items(
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?
     } else {
         sqlx::query_as(
-            "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                    vi.tags, vi.notes, COALESCE(cp.is_favorite, false),
-                    vi.last_accessed_at, vi.created_at, vi.updated_at
+            "SELECT vi.id, vi.parent_item_id, COALESCE(cp.is_favorite, false),
+                    vi.last_accessed_at, vi.created_at, vi.updated_at,
+                    vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
              FROM vault_items vi
              JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+             LEFT JOIN credential_key_envelopes cke
+               ON cke.item_id = vi.id AND cke.user_id = $1
              ORDER BY vi.created_at DESC
              LIMIT $2",
         )
@@ -429,21 +388,34 @@ pub async fn list_items(
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
         .map(
-            |(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
-                let tags = tags_val;
+            |(
+                id,
+                parent_id,
+                is_fav,
+                last_acc,
+                created,
+                updated,
+                encrypted_metadata,
+                encrypted_payload,
+                encrypted_dek,
+            )| {
                 VaultItemMeta {
                     id,
-                    name,
-                    credential_type: ctype,
+                    name: "Encrypted credential".into(),
+                    credential_type: "custom".into(),
                     parent_item_id: parent_id,
-                    tags,
-                    notes,
+                    tags: Vec::new(),
+                    notes: None,
                     payload_metadata: None,
                     is_favorite: is_fav,
                     last_accessed_at: last_acc.map(|t| t.to_string()),
                     created_at: created.to_string(),
                     updated_at: updated.to_string(),
                     inherited_from: None,
+                    metadata_locked: encrypted_metadata.is_none(),
+                    encrypted_metadata: encrypted_metadata.map(hex::encode),
+                    encrypted_payload: encrypted_payload.map(hex::encode),
+                    encrypted_dek: encrypted_dek.map(hex::encode),
                 }
             },
         )
@@ -476,17 +448,17 @@ pub async fn get_item(
     /* If no direct permission, look for inherited access via ancestor CTE */
     let inherited_from: Option<InheritedFrom> = if perm_row.is_none() {
         /* Walk up the parent_item_id chain to find nearest ancestor with permission */
-        let ancestor: Option<(Uuid, String)> = sqlx::query_as(
+        let ancestor: Option<(Uuid,)> = sqlx::query_as(
             "WITH RECURSIVE ancestors AS (
-               SELECT id, name, parent_item_id, 1 AS depth
+               SELECT id, parent_item_id, 1 AS depth
                FROM vault_items
                WHERE id = $1
                UNION ALL
-               SELECT vi.id, vi.name, vi.parent_item_id, a.depth + 1
+               SELECT vi.id, vi.parent_item_id, a.depth + 1
                FROM vault_items vi
                JOIN ancestors a ON vi.id = a.parent_item_id
              )
-             SELECT a.id, a.name
+             SELECT a.id
              FROM ancestors a
              JOIN credential_permissions cp ON cp.item_id = a.id AND cp.user_id = $2
              ORDER BY a.depth ASC
@@ -498,10 +470,10 @@ pub async fn get_item(
         .await
         .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-        if let Some((anc_id, anc_name)) = ancestor {
+        if let Some((anc_id,)) = ancestor {
             Some(InheritedFrom {
                 id: anc_id,
-                name: anc_name,
+                name: "Encrypted credential".into(),
             })
         } else {
             return Err(ApiError::new(AppError::NotFound));
@@ -512,24 +484,24 @@ pub async fn get_item(
 
     type ItemRow = (
         Uuid,
-        String,
-        String,
         Option<Uuid>,
-        Vec<String>,
-        Option<String>,
-        Option<serde_json::Value>,
         bool,
         Option<OffsetDateTime>,
         OffsetDateTime,
         OffsetDateTime,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
     );
 
     let row: Option<ItemRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                vi.tags, vi.notes, vi.payload_metadata, COALESCE(cp.is_favorite, false),
-                vi.last_accessed_at, vi.created_at, vi.updated_at
+        "SELECT vi.id, vi.parent_item_id, COALESCE(cp.is_favorite, false),
+                vi.last_accessed_at, vi.created_at, vi.updated_at,
+                vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          LEFT JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $2
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $2
          WHERE vi.id = $1",
     )
     .bind(item_id)
@@ -540,16 +512,14 @@ pub async fn get_item(
 
     let (
         id,
-        name,
-        ctype,
         parent_id,
-        tags_val,
-        notes,
-        payload_metadata,
         is_fav,
         last_acc,
         created,
         updated,
+        encrypted_metadata,
+        encrypted_payload,
+        encrypted_dek,
     ) = row.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     /* Update last_accessed_at */
@@ -568,20 +538,23 @@ pub async fn get_item(
     )
     .await;
 
-    let tags = tags_val;
     let meta = VaultItemMeta {
         id,
-        name,
-        credential_type: ctype,
+        name: "Encrypted credential".into(),
+        credential_type: "custom".into(),
         parent_item_id: parent_id,
-        tags,
-        notes,
-        payload_metadata,
+        tags: Vec::new(),
+        notes: None,
+        payload_metadata: None,
         is_favorite: is_fav,
         last_accessed_at: last_acc.map(|t| t.to_string()),
         created_at: created.to_string(),
         updated_at: updated.to_string(),
         inherited_from,
+        metadata_locked: encrypted_metadata.is_none(),
+        encrypted_metadata: encrypted_metadata.map(hex::encode),
+        encrypted_payload: encrypted_payload.map(hex::encode),
+        encrypted_dek: encrypted_dek.map(hex::encode),
     };
 
     Ok(Json(serde_json::json!({ "data": meta })))
@@ -613,51 +586,33 @@ pub async fn update_item(
         _ => {}
     }
 
-    validate_item_fields(&body)?;
-
-    let name = body["name"].as_str().unwrap().trim().to_string();
-    let ctype_str = body["credential_type"].as_str().unwrap();
-    let parent_item_id: Option<Uuid> = body
-        .get("parent_item_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| Uuid::parse_str(s).ok());
-    let tags: Vec<String> = body
-        .get("tags")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|t| t.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
+    validate_encrypted_item_fields(&body, false)?;
     let encrypted_payload: Option<&str> = body.get("encrypted_payload").and_then(|v| v.as_str());
-    let payload_metadata: Option<&serde_json::Value> = body.get("payload_metadata");
-    let notes: Option<&str> = body.get("notes").and_then(|v| v.as_str());
-
-    /* Cycle detection when parent_item_id is being set */
-    if let Some(proposed_parent) = parent_item_id {
-        check_cycle(db, item_id, proposed_parent)
-            .await
-            .map_err(ApiError::new)?;
-    }
-
-    let encrypted_payload_bytes: Option<Vec<u8>> =
-        encrypted_payload.map(|s| decode_base64_or_hex(s)).flatten();
+    let encrypted_metadata: Option<&str> =
+        body.get("encrypted_metadata").and_then(|v| v.as_str());
+    let encrypted_payload_bytes = encrypted_payload
+        .and_then(decode_base64_or_hex)
+        .ok_or_else(|| {
+            ApiError::new(AppError::UnprocessableEntity(
+                "The encrypted credential payload is invalid.".into(),
+            ))
+        })?;
+    let encrypted_metadata_bytes = encrypted_metadata
+        .and_then(decode_base64_or_hex)
+        .ok_or_else(|| {
+            ApiError::new(AppError::UnprocessableEntity(
+                "The encrypted credential metadata is invalid.".into(),
+            ))
+        })?;
 
     sqlx::query(
         "UPDATE vault_items
-         SET name = $1, credential_type = $2, tags = $3, encrypted_payload = $4,
-             payload_metadata = $5, notes = $6, parent_item_id = $8, updated_at = NOW()
-         WHERE id = $7",
+         SET encrypted_payload = $1, encrypted_metadata = $2, updated_at = NOW()
+         WHERE id = $3",
     )
-    .bind(&name)
-    .bind(ctype_str)
-    .bind(&tags as &[String])
     .bind(encrypted_payload_bytes)
-    .bind(payload_metadata)
-    .bind(notes)
+    .bind(encrypted_metadata_bytes)
     .bind(item_id)
-    .bind(parent_item_id)
     .execute(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -668,7 +623,7 @@ pub async fn update_item(
         "item.updated",
         Some(item_id),
         Some("vault_item"),
-        serde_json::json!({ "name": name }),
+        serde_json::json!({ "metadata_encrypted": true }),
     )
     .await;
 
@@ -810,44 +765,55 @@ pub async fn search_items(
     }
 
     let db = state.db();
-    let pattern = format!("%{q}%");
-
-    /* Search by name (ILIKE) or notes, and also check tags array contains the query */
-    type SearchRow = (Uuid, String, String, Vec<String>);
+    /* Names and tags are encrypted, so search candidates are filtered in the unlocked client. */
+    type SearchRow = (
+        Uuid,
+        Option<Uuid>,
+        bool,
+        Option<OffsetDateTime>,
+        OffsetDateTime,
+        OffsetDateTime,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+    );
     let rows: Vec<SearchRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type, vi.tags
+        "SELECT vi.id, vi.parent_item_id, COALESCE(cp.is_favorite, false),
+                vi.last_accessed_at, vi.created_at, vi.updated_at,
+                vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
-         WHERE vi.name ILIKE $2
-            OR vi.notes ILIKE $2
-            OR EXISTS (
-               SELECT 1 FROM jsonb_array_elements_text(vi.tags) AS t
-               WHERE t ILIKE $2
-            )
-         ORDER BY vi.name ASC
-         LIMIT 50",
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $1
+         ORDER BY vi.updated_at DESC, vi.id
+         LIMIT 500",
     )
     .bind(auth.user_id)
-    .bind(&pattern)
     .fetch_all(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    #[derive(Serialize)]
-    struct SearchResult {
-        id: Uuid,
-        name: String,
-        credential_type: String,
-        tags: Vec<String>,
-    }
-
-    let results: Vec<SearchResult> = rows
+    let results: Vec<VaultItemMeta> = rows
         .into_iter()
-        .map(|(id, name, ctype, tags_val)| SearchResult {
-            id,
-            name,
-            credential_type: ctype,
-            tags: tags_val,
+        .map(|(id, parent_id, is_fav, last_acc, created, updated, metadata, payload, dek)| {
+            VaultItemMeta {
+                id,
+                name: "Encrypted credential".into(),
+                credential_type: "custom".into(),
+                parent_item_id: parent_id,
+                tags: Vec::new(),
+                notes: None,
+                payload_metadata: None,
+                is_favorite: is_fav,
+                last_accessed_at: last_acc.map(|value| value.to_string()),
+                created_at: created.to_string(),
+                updated_at: updated.to_string(),
+                inherited_from: None,
+                metadata_locked: metadata.is_none(),
+                encrypted_metadata: metadata.map(hex::encode),
+                encrypted_payload: payload.map(hex::encode),
+                encrypted_dek: dek.map(hex::encode),
+            }
         })
         .collect();
 
@@ -864,23 +830,24 @@ pub async fn list_favorites(
 
     type ItemRow = (
         Uuid,
-        String,
-        String,
         Option<Uuid>,
-        Vec<String>,
-        Option<String>,
         Option<OffsetDateTime>,
         OffsetDateTime,
         OffsetDateTime,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
     );
 
     let rows: Vec<ItemRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                vi.tags, vi.notes, vi.last_accessed_at, vi.created_at, vi.updated_at
+        "SELECT vi.id, vi.parent_item_id, vi.last_accessed_at, vi.created_at, vi.updated_at,
+                vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $1
          WHERE cp.is_favorite = true
-         ORDER BY vi.name ASC",
+         ORDER BY vi.created_at DESC",
     )
     .bind(auth.user_id)
     .fetch_all(db)
@@ -890,20 +857,33 @@ pub async fn list_favorites(
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
         .map(
-            |(id, name, ctype, parent_id, tags_val, notes, last_acc, created, updated)| {
+            |(
+                id,
+                parent_id,
+                last_acc,
+                created,
+                updated,
+                encrypted_metadata,
+                encrypted_payload,
+                encrypted_dek,
+            )| {
                 VaultItemMeta {
                     id,
-                    name,
-                    credential_type: ctype,
+                    name: "Encrypted credential".into(),
+                    credential_type: "custom".into(),
                     parent_item_id: parent_id,
-                    tags: tags_val,
-                    notes,
+                    tags: Vec::new(),
+                    notes: None,
                     payload_metadata: None,
                     is_favorite: true,
                     last_accessed_at: last_acc.map(|t| t.to_string()),
                     created_at: created.to_string(),
                     updated_at: updated.to_string(),
                     inherited_from: None,
+                    metadata_locked: encrypted_metadata.is_none(),
+                    encrypted_metadata: encrypted_metadata.map(hex::encode),
+                    encrypted_payload: encrypted_payload.map(hex::encode),
+                    encrypted_dek: encrypted_dek.map(hex::encode),
                 }
             },
         )
@@ -999,23 +979,24 @@ pub async fn recent_items(
 
     type ItemRow = (
         Uuid,
-        String,
-        String,
         Option<Uuid>,
-        Vec<String>,
-        Option<String>,
         bool,
         Option<OffsetDateTime>,
         OffsetDateTime,
         OffsetDateTime,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
     );
 
     let rows: Vec<ItemRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id,
-                vi.tags, vi.notes, COALESCE(cp.is_favorite, false),
-                vi.last_accessed_at, vi.created_at, vi.updated_at
+        "SELECT vi.id, vi.parent_item_id, COALESCE(cp.is_favorite, false),
+                vi.last_accessed_at, vi.created_at, vi.updated_at,
+                vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $1
          WHERE vi.last_accessed_at IS NOT NULL
          ORDER BY vi.last_accessed_at DESC
          LIMIT 20",
@@ -1028,20 +1009,34 @@ pub async fn recent_items(
     let items: Vec<VaultItemMeta> = rows
         .into_iter()
         .map(
-            |(id, name, ctype, parent_id, tags_val, notes, is_fav, last_acc, created, updated)| {
+            |(
+                id,
+                parent_id,
+                is_fav,
+                last_acc,
+                created,
+                updated,
+                encrypted_metadata,
+                encrypted_payload,
+                encrypted_dek,
+            )| {
                 VaultItemMeta {
                     id,
-                    name,
-                    credential_type: ctype,
+                    name: "Encrypted credential".into(),
+                    credential_type: "custom".into(),
                     parent_item_id: parent_id,
-                    tags: tags_val,
-                    notes,
+                    tags: Vec::new(),
+                    notes: None,
                     payload_metadata: None,
                     is_favorite: is_fav,
                     last_accessed_at: last_acc.map(|t| t.to_string()),
                     created_at: created.to_string(),
                     updated_at: updated.to_string(),
                     inherited_from: None,
+                    metadata_locked: encrypted_metadata.is_none(),
+                    encrypted_metadata: encrypted_metadata.map(hex::encode),
+                    encrypted_payload: encrypted_payload.map(hex::encode),
+                    encrypted_dek: encrypted_dek.map(hex::encode),
                 }
             },
         )
@@ -1087,7 +1082,7 @@ fn decode_archive_bytes(value: Option<&str>, field: &str) -> Result<Option<Vec<u
 }
 
 fn validate_archive(archive: VaultArchive) -> Result<Vec<ValidatedArchiveItem>, ApiError> {
-    if archive.version != 1 {
+    if archive.version != 2 {
         return Err(archive_validation_error("version", "unsupported"));
     }
     if archive.items.len() > MAX_ARCHIVE_ITEMS {
@@ -1140,48 +1135,21 @@ fn validate_archive(archive: VaultArchive) -> Result<Vec<ValidatedArchiveItem>, 
         .items
         .into_iter()
         .map(|item| {
-            let name = item.name.trim().to_owned();
-            if name.is_empty() || name.len() > MAX_NAME_LEN {
-                return Err(archive_validation_error("items.name", "length_1_255"));
+            let encrypted_metadata =
+                decode_archive_bytes(item.encrypted_metadata.as_deref(), "items.encrypted_metadata")?;
+            if encrypted_metadata.as_ref().is_some_and(|data| {
+                data.len() < 29 || data.len() > MAX_PAYLOAD_BYTES
+            }) {
+                return Err(archive_validation_error(
+                    "items.encrypted_metadata",
+                    "invalid_size",
+                ));
             }
-            if item.tags.len() > MAX_TAG_COUNT {
-                return Err(archive_validation_error("items.tags", "max_20"));
-            }
-            let tags = item
-                .tags
-                .into_iter()
-                .map(|tag| tag.trim().to_owned())
-                .collect::<Vec<_>>();
-            if tags
-                .iter()
-                .any(|tag| tag.is_empty() || tag.len() > MAX_TAG_LEN)
-            {
-                return Err(archive_validation_error("items.tags", "each_max_50_chars"));
-            }
-            if item
-                .notes
-                .as_ref()
-                .is_some_and(|notes| notes.len() > MAX_NOTES_LEN)
-            {
-                return Err(archive_validation_error("items.notes", "max_10000_chars"));
-            }
-
-            let credential_type = CredentialType::from_str(&item.credential_type)
-                .ok_or_else(|| archive_validation_error("items.credential_type", "invalid_enum"))?;
-            if let Some(metadata) = item.payload_metadata.as_ref() {
-                if validate_payload_metadata(&credential_type, metadata).is_err() {
-                    return Err(archive_validation_error(
-                        "items.payload_metadata",
-                        "missing_required_fields",
-                    ));
-                }
-            }
-
             let encrypted_payload =
                 decode_archive_bytes(item.encrypted_payload.as_deref(), "items.encrypted_payload")?;
             if encrypted_payload
                 .as_ref()
-                .is_some_and(|payload| payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES)
+                .is_some_and(|payload| payload.len() < 29 || payload.len() > MAX_PAYLOAD_BYTES)
             {
                 return Err(archive_validation_error(
                     "items.encrypted_payload",
@@ -1192,29 +1160,27 @@ fn validate_archive(archive: VaultArchive) -> Result<Vec<ValidatedArchiveItem>, 
                 decode_archive_bytes(item.encrypted_dek.as_deref(), "items.encrypted_dek")?;
             if encrypted_dek
                 .as_ref()
-                .is_some_and(|dek| dek.is_empty() || dek.len() > MAX_PAYLOAD_BYTES)
+                .is_some_and(|dek| dek.len() != 512)
             {
                 return Err(archive_validation_error(
                     "items.encrypted_dek",
                     "invalid_size",
                 ));
             }
-            if encrypted_payload.is_some() && encrypted_dek.is_none() {
+            if (encrypted_metadata.is_some() || encrypted_payload.is_some())
+                && encrypted_dek.is_none()
+            {
                 return Err(archive_validation_error(
                     "items.encrypted_dek",
-                    "required_for_encrypted_payload",
+                    "required_for_encrypted_data",
                 ));
             }
 
             Ok(ValidatedArchiveItem {
                 id: item.id,
-                name,
-                credential_type: item.credential_type,
                 parent_item_id: item.parent_item_id,
-                tags,
-                notes: item.notes,
+                encrypted_metadata,
                 encrypted_payload,
-                payload_metadata: item.payload_metadata,
                 encrypted_dek,
             })
         })
@@ -1232,17 +1198,13 @@ pub async fn export_vault(
     type ExportRow = (
         Uuid,
         Option<Uuid>,
-        String,
-        String,
-        Vec<String>,
-        Option<String>,
         Option<Vec<u8>>,
-        Option<serde_json::Value>,
+        Option<Vec<u8>>,
         Option<Vec<u8>>,
     );
     let rows: Vec<ExportRow> = sqlx::query_as(
-        "SELECT vi.id, vi.parent_item_id, vi.name, vi.credential_type, vi.tags,
-                vi.notes, vi.encrypted_payload, vi.payload_metadata, cke.encrypted_dek
+        "SELECT vi.id, vi.parent_item_id, vi.encrypted_metadata,
+                vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN vaults v ON v.id = vi.vault_id
          LEFT JOIN credential_key_envelopes cke
@@ -1256,38 +1218,25 @@ pub async fn export_vault(
     .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
 
     let mut items = Vec::with_capacity(rows.len());
-    for (
-        id,
-        parent_item_id,
-        name,
-        credential_type,
-        tags,
-        notes,
-        encrypted_payload,
-        payload_metadata,
-        encrypted_dek,
-    ) in rows
+    for (id, parent_item_id, encrypted_metadata, encrypted_payload, encrypted_dek) in rows
     {
-        if encrypted_payload.is_some() && encrypted_dek.is_none() {
+        if (encrypted_metadata.is_some() || encrypted_payload.is_some()) && encrypted_dek.is_none()
+        {
             return Err(ApiError::new(AppError::Internal(anyhow::anyhow!(
                 "owned vault item is missing its encrypted key envelope"
             ))));
         }
         items.push(ArchiveItem {
             id,
-            name,
-            credential_type,
             parent_item_id,
-            tags,
-            notes,
+            encrypted_metadata: encrypted_metadata.map(hex::encode),
             encrypted_payload: encrypted_payload.map(hex::encode),
-            payload_metadata,
             encrypted_dek: encrypted_dek.map(hex::encode),
         });
     }
 
     Ok(Json(serde_json::json!({
-        "data": VaultArchive { version: 1, items }
+        "data": VaultArchive { version: 2, items }
     })))
 }
 
@@ -1340,17 +1289,15 @@ pub(super) async fn import_vault(
         sqlx::query(
             "INSERT INTO vault_items
              (id, vault_id, name, credential_type, parent_item_id, tags,
-              encrypted_payload, payload_metadata, notes, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $9)",
+              encrypted_payload, payload_metadata, notes, encrypted_metadata,
+              created_at, updated_at)
+             VALUES ($1, $2, 'Encrypted credential', 'custom', NULL, '{}',
+                     $3, NULL, NULL, $4, $5, $5)",
         )
         .bind(item.id)
         .bind(vault_id)
-        .bind(&item.name)
-        .bind(&item.credential_type)
-        .bind(&item.tags)
         .bind(&item.encrypted_payload)
-        .bind(&item.payload_metadata)
-        .bind(&item.notes)
+        .bind(&item.encrypted_metadata)
         .bind(now)
         .execute(&mut *tx)
         .await
@@ -1504,13 +1451,9 @@ mod archive_tests {
     fn archive_item(id: Uuid, parent_item_id: Option<Uuid>) -> ArchiveItem {
         ArchiveItem {
             id,
-            name: "Credential".into(),
-            credential_type: "custom".into(),
             parent_item_id,
-            tags: vec!["backup".into()],
-            notes: None,
+            encrypted_metadata: None,
             encrypted_payload: None,
-            payload_metadata: None,
             encrypted_dek: None,
         }
     }
@@ -1519,7 +1462,7 @@ mod archive_tests {
     fn archive_validation_accepts_valid_hierarchy() {
         let parent_id = Uuid::new_v4();
         let archive = VaultArchive {
-            version: 1,
+            version: 2,
             items: vec![
                 archive_item(parent_id, None),
                 archive_item(Uuid::new_v4(), Some(parent_id)),
@@ -1532,7 +1475,7 @@ mod archive_tests {
     fn archive_validation_rejects_duplicate_ids_and_parent_cycles() {
         let id = Uuid::new_v4();
         let duplicate_archive = VaultArchive {
-            version: 1,
+            version: 2,
             items: vec![archive_item(id, None), archive_item(id, None)],
         };
         assert!(validate_archive(duplicate_archive).is_err());
@@ -1554,13 +1497,13 @@ mod archive_tests {
         let mut item = archive_item(Uuid::new_v4(), None);
         item.encrypted_payload = Some("not a ciphertext!".into());
         let archive = VaultArchive {
-            version: 1,
+            version: 2,
             items: vec![item],
         };
         assert!(validate_archive(archive).is_err());
 
         let with_path = serde_json::json!({
-            "version": 1,
+            "version": 2,
             "items": [],
             "path": "../../outside"
         });
@@ -1570,13 +1513,13 @@ mod archive_tests {
     #[test]
     fn archive_validation_rejects_missing_parent_and_unsupported_version() {
         let archive = VaultArchive {
-            version: 1,
+            version: 2,
             items: vec![archive_item(Uuid::new_v4(), Some(Uuid::new_v4()))],
         };
         assert!(validate_archive(archive).is_err());
 
         let archive = VaultArchive {
-            version: 2,
+            version: 1,
             items: Vec::new(),
         };
         assert!(validate_archive(archive).is_err());

@@ -302,15 +302,16 @@ pub async fn project_credentials(
         .ok_or_else(|| ApiError::new(AppError::NotFound))?;
     workspace_member_role(db, workspace_id, auth.user_id).await?;
 
-    type CredRow = (Uuid, String, String);
+    type CredRow = (Uuid, Option<Vec<u8>>, Option<Vec<u8>>, Option<Vec<u8>>);
     let rows: Vec<CredRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type
+        "SELECT DISTINCT vi.id, vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_usage cu ON cu.item_id = vi.id
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $2
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $2
          WHERE cu.project_id = $1
-         GROUP BY vi.id, vi.name, vi.credential_type
-         ORDER BY vi.name ASC",
+         ORDER BY vi.id",
     )
     .bind(project_id)
     .bind(auth.user_id)
@@ -323,13 +324,19 @@ pub async fn project_credentials(
         id: Uuid,
         name: String,
         credential_type: String,
+        encrypted_metadata: Option<String>,
+        encrypted_payload: Option<String>,
+        encrypted_dek: Option<String>,
     }
     let items: Vec<CredItem> = rows
         .into_iter()
-        .map(|(id, name, ct)| CredItem {
+        .map(|(id, metadata, payload, dek)| CredItem {
             id,
-            name,
-            credential_type: ct,
+            name: "Encrypted credential".into(),
+            credential_type: "custom".into(),
+            encrypted_metadata: metadata.map(hex::encode),
+            encrypted_payload: payload.map(hex::encode),
+            encrypted_dek: dek.map(hex::encode),
         })
         .collect();
     Ok(Json(serde_json::json!({ "data": items })))

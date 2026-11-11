@@ -14,8 +14,8 @@ pub async fn get_key_envelope(
     Extension(auth): Extension<AuthUser>,
     Path(item_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let envelope: Option<(Option<Vec<u8>>, Vec<u8>)> = sqlx::query_as(
-        "SELECT vi.encrypted_payload, cke.encrypted_dek
+    let envelope: Option<(Option<Vec<u8>>, Option<Vec<u8>>, Vec<u8>)> = sqlx::query_as(
+        "SELECT vi.encrypted_payload, vi.encrypted_metadata, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_key_envelopes cke ON cke.item_id = vi.id
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = cke.user_id
@@ -27,13 +27,14 @@ pub async fn get_key_envelope(
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
-    let (encrypted_payload, encrypted_dek) =
+    let (encrypted_payload, encrypted_metadata, encrypted_dek) =
         envelope.ok_or_else(|| ApiError::new(AppError::NotFound))?;
-    let encrypted_payload = encrypted_payload.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let encrypted_metadata = encrypted_metadata.ok_or_else(|| ApiError::new(AppError::NotFound))?;
 
     Ok(Json(serde_json::json!({
         "data": {
-            "encrypted_payload": hex::encode(encrypted_payload),
+            "encrypted_payload": encrypted_payload.map(hex::encode),
+            "encrypted_metadata": hex::encode(encrypted_metadata),
             "encrypted_dek": hex::encode(encrypted_dek),
         }
     })))

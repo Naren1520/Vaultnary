@@ -18,6 +18,7 @@ export default function EmptyState({
     <div
       role="status"
       aria-label={title}
+      className="app-empty-state"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -29,16 +30,16 @@ export default function EmptyState({
         color: 'var(--color-text-muted)',
       }}
     >
-      <span aria-hidden="true" style={{ color: 'var(--color-border)' }}>
+      <span aria-hidden="true" className="app-empty-state__icon">
         {icon ?? <FolderOpen size={32} />}
       </span>
-      <p style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text)' }}>
+      <p className="app-empty-state__title" style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text)' }}>
         {title}
       </p>
       {message && (
-        <p style={{ fontSize: 'var(--text-sm)', maxWidth: '20rem' }}>{message}</p>
+        <p className="app-empty-state__message" style={{ fontSize: 'var(--text-sm)' }}>{message}</p>
       )}
-      {action && <div>{action}</div>}
+      {action && <div className="app-empty-state__action">{action}</div>}
     </div>
   )
 }

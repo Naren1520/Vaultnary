@@ -100,10 +100,16 @@ export default function ProjectsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Topbar breadcrumbs={[{ label: 'Projects', href: '/app/projects' }]} />
-      <div style={{ padding: 'var(--space-4)', overflowY: 'auto', flex: 1 }}>
+      <div className="app-page-content" style={{ padding: 'var(--space-4)', overflowY: 'auto', flex: 1 }}>
+        <header className="app-page-heading">
+          <p className="app-page-heading__eyebrow">Organize</p>
+          <h1>Projects</h1>
+          <p>Group related services and credentials into clear, manageable spaces.</p>
+        </header>
         <form
           onSubmit={handleCreate}
           aria-label="Create project"
+          className="app-create-form"
           style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
         >
           <label htmlFor="project-name" style={visuallyHiddenStyle}>Project name</label>

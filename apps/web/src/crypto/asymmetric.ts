@@ -10,12 +10,30 @@ const RSA_PARAMS: RsaHashedKeyGenParams = {
   hash: 'SHA-256',
 }
 
-/** Generate a new RSA-OAEP-4096 key pair. Both keys are non-extractable. */
+/** Generate a key pair for initialization; persist only the public key and encrypted PKCS8 private key. */
 export async function generateKekPair(): Promise<CryptoKeyPair> {
-  return crypto.subtle.generateKey(RSA_PARAMS, false /* non-extractable */, [
+  return crypto.subtle.generateKey(RSA_PARAMS, true, [
     'encrypt',
     'decrypt',
   ])
+}
+
+export async function exportPrivateKey(privateKey: CryptoKey): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.exportKey('pkcs8', privateKey))
+}
+
+export async function importPrivateKey(pkcs8Bytes: Uint8Array): Promise<CryptoKey> {
+  const buffer = pkcs8Bytes.buffer.slice(
+    pkcs8Bytes.byteOffset,
+    pkcs8Bytes.byteOffset + pkcs8Bytes.byteLength,
+  ) as ArrayBuffer
+  return crypto.subtle.importKey(
+    'pkcs8',
+    buffer,
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['decrypt'],
+  )
 }
 
 /**

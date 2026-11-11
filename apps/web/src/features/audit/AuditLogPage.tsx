@@ -42,7 +42,12 @@ export default function AuditLogPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Topbar breadcrumbs={[{ label: 'Audit Log', href: '/app/audit' }]} />
-      <div style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
+      <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
+        <header className="app-page-heading">
+          <p className="app-page-heading__eyebrow">Workspace activity</p>
+          <h1>Audit log</h1>
+          <p>Review security and account events recorded for your workspace.</p>
+        </header>
         {/* Filters */}
         <div className="audit-filter">
           <label htmlFor="action-filter" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Filter by action</label>

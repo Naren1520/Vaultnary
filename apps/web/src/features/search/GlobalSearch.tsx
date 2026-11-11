@@ -3,16 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import CredentialBadge, { CredentialType } from '../../components/ui/CredentialBadge'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import { apiGet } from '../../services/http-client'
-
-interface SearchResult {
-  id: string
-  name: string
-  credential_type: CredentialType
-  tags: string[]
-}
+import { useVaultStore } from '../../state/vault-store'
+import { decryptVaultMetadata, type EncryptedVaultItem } from '../vault/metadata'
 
 interface SearchResponse {
-  data: SearchResult[]
+  data: EncryptedVaultItem[]
 }
 
 interface GlobalSearchProps {
@@ -33,49 +28,63 @@ const DEBOUNCE_MS = 300
  */
 export default function GlobalSearch({ query, onQueryChange }: GlobalSearchProps) {
   const navigate = useNavigate()
-  const [results, setResults] = useState<SearchResult[]>([])
+  const { isUnlocked: isVaultUnlocked, privateKey } = useVaultStore()
+  const [results, setResults] = useState<Array<{ id: string; name: string; credential_type: CredentialType }>>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   /* Debounced search */
   useEffect(() => {
-    if (!query.trim()) {
+    if (!isVaultUnlocked || !privateKey || !query.trim()) {
       setResults([])
       setOpen(false)
+      setLoading(false)
       return
     }
 
     setLoading(true)
     setOpen(true)
 
-    const timer = setTimeout(() => {
-      let cancelled = false
-      const ctrl = new AbortController()
-
-      apiGet<SearchResponse>(`/api/v1/vault/search?q=${encodeURIComponent(query.trim())}`, {
-        signal: ctrl.signal,
-      })
-        .then((res) => {
-          if (cancelled) return
-          setResults(res.data)
-          setOpen(res.data.length > 0)
-        })
-        .catch(() => {
-          if (!cancelled) setResults([])
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-
-      return () => {
-        cancelled = true
-        ctrl.abort()
+    let cancelled = false
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiGet<SearchResponse>(
+          `/api/v1/vault/search?q=${encodeURIComponent(query.trim())}`,
+          { signal: ctrl.signal },
+        )
+        const decrypted = await Promise.all(
+          res.data.map((item) => decryptVaultMetadata(item, privateKey)),
+        )
+        if (cancelled) return
+        const search = query.trim().toLocaleLowerCase()
+        const matches = decrypted
+          .filter((item) => !item.legacy)
+          .filter((item) =>
+            [item.name, item.credential_type, ...item.tags]
+              .some((value) => value.toLocaleLowerCase().includes(search)),
+          )
+          .map(({ id, name, credential_type }) => ({
+            id,
+            name,
+            credential_type,
+          }))
+        setResults(matches)
+        setOpen(matches.length > 0)
+      } catch {
+        if (!cancelled) setResults([])
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }, DEBOUNCE_MS)
 
-    return () => clearTimeout(timer)
-  }, [query])
+    return () => {
+      cancelled = true
+      ctrl.abort()
+      clearTimeout(timer)
+    }
+  }, [isVaultUnlocked, privateKey, query])
 
   /* Close dropdown when clicking outside */
   useEffect(() => {
@@ -102,6 +111,27 @@ export default function GlobalSearch({ query, onQueryChange }: GlobalSearchProps
   }
 
   const showDropdown = open && query.trim().length > 0
+
+  if (!isVaultUnlocked) {
+    return (
+      <input
+        type="search"
+        value=""
+        disabled
+        placeholder="Unlock vault to search"
+        aria-label="Unlock the vault to search"
+        style={{
+          width: '100%',
+          padding: 'var(--space-1) var(--space-3)',
+          border: 'var(--border-input)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--text-sm)',
+          backgroundColor: 'var(--color-bg-subtle)',
+          color: 'var(--color-text-muted)',
+        }}
+      />
+    )
+  }
 
   return (
     <div

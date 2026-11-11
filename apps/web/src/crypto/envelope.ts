@@ -25,6 +25,8 @@ export async function generateDek(): Promise<CryptoKey> {
 export interface SealedItem {
   /** AES-256-GCM ciphertext: nonce(12) || ciphertext || tag(16) */
   encryptedPayload: Uint8Array
+  /** Encrypted credential metadata, readable only by holders of the wrapped DEK. */
+  encryptedMetadata: Uint8Array
   /** RSA-OAEP wrapped DEK */
   encryptedDek: Uint8Array
 }
@@ -41,13 +43,44 @@ export interface SealedItem {
  */
 export async function sealItem(
   secret: Record<string, unknown>,
+  metadata: Record<string, unknown>,
   ownerPublicKey: CryptoKey,
 ): Promise<SealedItem> {
   const dek = await generateDek()
   const plaintext = new TextEncoder().encode(JSON.stringify(secret))
   const encryptedPayload = await encrypt(dek, plaintext)
+  const encryptedMetadata = await encrypt(
+    dek,
+    new TextEncoder().encode(JSON.stringify(metadata)),
+  )
   const encryptedDek = await encryptDek(dek, ownerPublicKey)
-  return { encryptedPayload, encryptedDek }
+  return { encryptedPayload, encryptedMetadata, encryptedDek }
+}
+
+export async function sealItemWithDek(
+  secret: Record<string, unknown>,
+  metadata: Record<string, unknown>,
+  dek: CryptoKey,
+): Promise<Omit<SealedItem, 'encryptedDek'>> {
+  const [encryptedPayload, encryptedMetadata] = await Promise.all([
+    encrypt(dek, new TextEncoder().encode(JSON.stringify(secret))),
+    encrypt(dek, new TextEncoder().encode(JSON.stringify(metadata))),
+  ])
+  return { encryptedPayload, encryptedMetadata }
+}
+
+export async function openMetadata(
+  encryptedMetadata: Uint8Array,
+  encryptedDek: Uint8Array,
+  privateKey: CryptoKey,
+): Promise<Record<string, unknown>> {
+  const dek = await decryptDek(encryptedDek, privateKey)
+  const plaintext = await decrypt(dek, encryptedMetadata)
+  const value: unknown = JSON.parse(new TextDecoder().decode(plaintext))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Credential metadata is invalid.')
+  }
+  return value as Record<string, unknown>
 }
 
 /**

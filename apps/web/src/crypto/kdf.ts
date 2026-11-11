@@ -17,11 +17,15 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
     dkLen: 32, // 256-bit output
   })
 
-  return crypto.subtle.importKey(
-    'raw',
-    keyBytes.buffer as ArrayBuffer,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  )
+  try {
+    return await crypto.subtle.importKey(
+      'raw',
+      keyBytes.buffer as ArrayBuffer,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    )
+  } finally {
+    keyBytes.fill(0)
+  }
 }

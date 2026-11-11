@@ -14,8 +14,8 @@ interface SecretFieldProps {
 
 interface KeyEnvelopeResponse {
   data: {
-    encrypted_payload: string
-    encrypted_dek: string
+    encrypted_payload: string | null
+    encrypted_dek: string | null
   }
 }
 
@@ -47,10 +47,10 @@ export default function SecretField({ itemId, label, value: preloadedValue }: Se
 
   /* When itemId or preloadedValue changes, reset decrypted state */
   useEffect(() => {
-    setDecryptedValue(preloadedValue)
+    setDecryptedValue(isUnlocked ? preloadedValue : undefined)
     setRevealed(false)
     clearMaskTimer()
-  }, [itemId, preloadedValue])
+  }, [itemId, preloadedValue, isUnlocked, privateKey])
 
   function clearMaskTimer() {
     if (maskTimer.current) {
@@ -73,8 +73,11 @@ export default function SecretField({ itemId, label, value: preloadedValue }: Se
         `/api/v1/vault/items/${itemId}/key-envelope`,
       )
       const { encrypted_payload, encrypted_dek } = res.data
+      if (!encrypted_payload || !encrypted_dek) {
+        throw new Error('This legacy credential has no recoverable encrypted secret.')
+      }
 
-      /* Convert hex/base64 strings to Uint8Array */
+      /* Convert the server's hex ciphertexts to Uint8Array */
       const payloadBytes = hexOrBase64ToBytes(encrypted_payload)
       const dekBytes = hexOrBase64ToBytes(encrypted_dek)
 
@@ -243,11 +246,5 @@ function hexOrBase64ToBytes(s: string): Uint8Array {
     }
     return buf
   }
-  /* Base64 */
-  const bin = atob(s)
-  const buf = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) {
-    buf[i] = bin.charCodeAt(i)
-  }
-  return buf
+  throw new Error('Encrypted credential data is invalid.')
 }

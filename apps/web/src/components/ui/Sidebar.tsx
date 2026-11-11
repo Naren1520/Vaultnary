@@ -27,7 +27,6 @@ export default function Sidebar() {
       aria-label="Main navigation"
       className="app-sidebar"
     >
-      {/* Brand / Logo */}
       <div
         className="sidebar-brand"
       >
@@ -36,8 +35,8 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      {/* Nav links */}
       <nav aria-label="Sidebar navigation">
+        <p className="sidebar-section-label">Workspace</p>
         <ul className="sidebar-links">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.href)

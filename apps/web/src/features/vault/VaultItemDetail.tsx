@@ -3,18 +3,12 @@ import { useParams } from 'react-router-dom'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import CredentialBadge, { CredentialType } from '../../components/ui/CredentialBadge'
 import { apiGet } from '../../services/http-client'
+import { useVaultStore } from '../../state/vault-store'
+import { decryptVaultMetadata, type EncryptedVaultItem, type VaultItem } from './metadata'
 import SecretField from './SecretField'
 
-interface VaultItemMeta {
-  id: string
-  name: string
-  credential_type: CredentialType
-  payload_metadata: Record<string, string> | null
-  tags: string[]
-  notes: string | null
+interface VaultItemMeta extends EncryptedVaultItem {
   last_accessed_at: string | null
-  created_at: string
-  updated_at: string
   inherited_from: { id: string; name: string } | null
 }
 
@@ -34,8 +28,10 @@ interface DetailResponse {
 
 export default function VaultItemDetail() {
   const { itemId } = useParams<{ itemId: string }>()
-  const [item, setItem] = useState<VaultItemMeta | null>(null)
+  const privateKey = useVaultStore((state) => state.privateKey)
+  const [item, setItem] = useState<(VaultItem & Pick<VaultItemMeta, 'inherited_from'>) | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!itemId) return
@@ -43,20 +39,30 @@ export default function VaultItemDetail() {
     const ctrl = new AbortController()
 
     setLoading(true)
+    setError('')
     apiGet<DetailResponse>(`/api/v1/vault/items/${itemId}`, { signal: ctrl.signal })
-      .then((res) => { if (!cancelled) setItem(res.data) })
-      .catch(() => { if (!cancelled) setItem(null) })
+      .then(async (res) => {
+        if (!privateKey) throw new Error('Unlock the vault to view this credential.')
+        const metadata = await decryptVaultMetadata(res.data, privateKey)
+        if (!cancelled) setItem({ ...metadata, inherited_from: res.data.inherited_from })
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          setItem(null)
+          setError(cause instanceof Error ? cause.message : 'Could not decrypt credential metadata.')
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true; ctrl.abort() }
-  }, [itemId])
+  }, [itemId, privateKey])
 
   if (loading) return <SkeletonLoader variant="detail-panel" />
 
   if (!item) {
     return (
-      <div style={{ padding: 'var(--space-4)', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-        Item not found or access denied.
+      <div role="alert" style={{ padding: 'var(--space-4)', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+        {error || 'Item not found or access denied.'}
       </div>
     )
   }
@@ -77,12 +83,21 @@ export default function VaultItemDetail() {
         </p>
       )}
 
+      {item.legacy && (
+        <p role="status" style={{ color: 'var(--color-warning, #865d10)', fontSize: 'var(--text-sm)' }}>
+          This credential predates encrypted metadata. Its original metadata cannot be recovered
+          automatically; the existing record and any encrypted secret have been preserved.
+        </p>
+      )}
+
       {item.payload_metadata && Object.entries(item.payload_metadata).map(([key, value]) => (
         <div key={key}>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
             {key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}
           </p>
-          <p style={{ fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>{value}</p>
+          <p style={{ fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>
+            {typeof value === 'string' ? value : JSON.stringify(value)}
+          </p>
         </div>
       ))}
 

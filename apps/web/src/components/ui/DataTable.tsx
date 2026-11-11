@@ -51,7 +51,7 @@ export default function DataTable<T>({
   }
 
   return (
-    <div style={{ overflowX: 'auto', width: '100%' }}>
+    <div className="data-table-scroll" style={{ overflowX: 'auto', width: '100%' }}>
       <table
         style={{
           width: '100%',

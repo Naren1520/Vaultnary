@@ -128,10 +128,16 @@ export default function ServicesPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Topbar breadcrumbs={[{ label: 'Services', href: '/app/services' }]} />
-      <div style={{ padding: 'var(--space-4)', flex: 1 }}>
+      <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1 }}>
+        <header className="app-page-heading">
+          <p className="app-page-heading__eyebrow">Infrastructure</p>
+          <h1>Services</h1>
+          <p>Keep credentials connected to the environments and services that use them.</p>
+        </header>
         <form
           onSubmit={handleCreate}
           aria-label="Create service"
+          className="app-create-form"
           style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
         >
           <label htmlFor="service-name" style={visuallyHiddenStyle}>Service name</label>

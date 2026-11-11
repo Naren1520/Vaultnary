@@ -21,6 +21,7 @@ pub mod sessions;
 pub mod sharing;
 pub mod usage;
 pub mod users;
+pub mod vault_key;
 pub mod vaults;
 pub mod workspaces;
 
@@ -51,6 +52,19 @@ fn v1_routes() -> Router<AppState> {
         .route("/auth/forgot-password", post(auth::forgot_password))
         .route("/auth/reset-password", post(auth::reset_password))
         .route("/auth/public-keys/:user_id", get(auth::public_keys))
+        .route("/vault/key-material", get(vault_key::get_key_material))
+        .route(
+            "/vault/key-material",
+            post(vault_key::initialize_vault).layer::<_, std::convert::Infallible>(
+                RateLimitLayer::new(
+                    InMemoryStore::new(),
+                    RateLimitConfig {
+                        window: Duration::from_secs(60 * 60),
+                        max_requests: 3,
+                    },
+                ),
+            ),
+        )
         // Sessions (under auth namespace)
         .route("/auth/sessions", get(auth::list_sessions))
         .route("/auth/sessions", delete(auth::revoke_all_sessions))

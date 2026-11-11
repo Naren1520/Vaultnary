@@ -32,14 +32,23 @@ pub async fn get_children(
     }
 
     /* Fetch direct children where user has viewer+ permission */
-    type ChildRow = (Uuid, String, String, bool);
+    type ChildRow = (
+        Uuid,
+        bool,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+    );
     let rows: Vec<ChildRow> = sqlx::query_as(
-        "SELECT vi.id, vi.name, vi.credential_type,
-                EXISTS(SELECT 1 FROM vault_items c WHERE c.parent_item_id = vi.id) AS has_children
+        "SELECT vi.id,
+                EXISTS(SELECT 1 FROM vault_items c WHERE c.parent_item_id = vi.id) AS has_children,
+                vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $2
+         LEFT JOIN credential_key_envelopes cke
+           ON cke.item_id = vi.id AND cke.user_id = $2
          WHERE vi.parent_item_id = $1
-         ORDER BY vi.name ASC",
+         ORDER BY vi.created_at ASC",
     )
     .bind(item_id)
     .bind(auth.user_id)
@@ -53,16 +62,26 @@ pub async fn get_children(
         name: String,
         credential_type: String,
         has_children: bool,
+        encrypted_metadata: Option<String>,
+        encrypted_payload: Option<String>,
+        encrypted_dek: Option<String>,
     }
 
     let items: Vec<ChildItem> = rows
         .into_iter()
-        .map(|(id, name, ctype, has_children)| ChildItem {
-            id,
-            name,
-            credential_type: ctype,
-            has_children,
-        })
+        .map(
+            |(id, has_children, encrypted_metadata, encrypted_payload, encrypted_dek)| {
+                ChildItem {
+                    id,
+                    name: "Encrypted credential".into(),
+                    credential_type: "custom".into(),
+                    has_children,
+                    encrypted_metadata: encrypted_metadata.map(hex::encode),
+                    encrypted_payload: encrypted_payload.map(hex::encode),
+                    encrypted_dek: encrypted_dek.map(hex::encode),
+                }
+            },
+        )
         .collect();
 
     Ok(Json(serde_json::json!({ "data": items })))
@@ -89,23 +108,37 @@ pub async fn get_tree(
     let db = state.db();
 
     /* Recursive CTE: fetch tree N levels deep, only items user can access */
-    type TreeRow = (Uuid, String, String, Option<Uuid>, i32);
+    type TreeRow = (
+        Uuid,
+        Option<Uuid>,
+        i32,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+    );
     let rows: Vec<TreeRow> = sqlx::query_as(
         "WITH RECURSIVE tree AS (
-           SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id, 1 AS depth
+           SELECT vi.id, vi.parent_item_id, 1 AS depth,
+                  vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
            FROM vault_items vi
            JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+           LEFT JOIN credential_key_envelopes cke
+             ON cke.item_id = vi.id AND cke.user_id = $1
            WHERE vi.parent_item_id IS NULL
            UNION ALL
-           SELECT vi.id, vi.name, vi.credential_type, vi.parent_item_id, t.depth + 1
+           SELECT vi.id, vi.parent_item_id, t.depth + 1,
+                  vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
            FROM vault_items vi
            JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
+           LEFT JOIN credential_key_envelopes cke
+             ON cke.item_id = vi.id AND cke.user_id = $1
            JOIN tree t ON vi.parent_item_id = t.id
            WHERE t.depth < $2
          )
-         SELECT t.id, t.name, t.credential_type, t.parent_item_id, t.depth
+         SELECT t.id, t.parent_item_id, t.depth,
+                t.encrypted_metadata, t.encrypted_payload, t.encrypted_dek
          FROM tree t
-         ORDER BY t.depth, t.name",
+         ORDER BY t.depth, t.id",
     )
     .bind(auth.user_id)
     .bind(depth)
@@ -122,10 +155,13 @@ pub async fn get_tree(
         parent_item_id: Option<Uuid>,
         depth: i32,
         has_children: bool,
+        encrypted_metadata: Option<String>,
+        encrypted_payload: Option<String>,
+        encrypted_dek: Option<String>,
     }
 
     let mut items: Vec<TreeItem> = Vec::with_capacity(rows.len());
-    for (id, name, ctype, parent_id, d) in rows {
+    for (id, parent_id, d, encrypted_metadata, encrypted_payload, encrypted_dek) in rows {
         let (has_children,): (bool,) =
             sqlx::query_as("SELECT EXISTS(SELECT 1 FROM vault_items WHERE parent_item_id = $1)")
                 .bind(id)
@@ -135,11 +171,14 @@ pub async fn get_tree(
 
         items.push(TreeItem {
             id,
-            name,
-            credential_type: ctype,
+            name: "Encrypted credential".into(),
+            credential_type: "custom".into(),
             parent_item_id: parent_id,
             depth: d,
             has_children,
+            encrypted_metadata: encrypted_metadata.map(hex::encode),
+            encrypted_payload: encrypted_payload.map(hex::encode),
+            encrypted_dek: encrypted_dek.map(hex::encode),
         });
     }
 
