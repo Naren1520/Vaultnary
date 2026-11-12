@@ -20,6 +20,7 @@ const SECRET_CREDENTIAL_TYPES = new Set<CredentialType>([
   'ssh',
   'totp',
   'recovery_code',
+  'custom',
 ])
 
 interface DetailResponse {

@@ -1,7 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../services/http-client';
-import { sealItem } from '../../crypto/envelope';
+import { decryptDek, importPublicKey } from '../../crypto/asymmetric';
+import { openItem, openMetadata, sealItem, sealItemWithDek } from '../../crypto/envelope';
 import { useVaultStore } from '../../state/vault-store';
 import { ValidationError } from '../../services/error-handler';
 import Modal from '../ui/Modal';
@@ -52,17 +53,15 @@ const TYPE_LABELS = {
     custom: 'Custom',
 };
 /* Helpers                                                             */
-function importPublicKey(pem) {
-    /* Strip PEM header/footer and decode base64 */
-    const b64 = pem
-        .replace(/-----BEGIN PUBLIC KEY-----/, '')
-        .replace(/-----END PUBLIC KEY-----/, '')
-        .replace(/\s+/g, '');
-    const bin = atob(b64);
-    const buf = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++)
-        buf[i] = bin.charCodeAt(i);
-    return crypto.subtle.importKey('spki', buf.buffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+function hexToBytes(value) {
+    if (value.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(value)) {
+        throw new Error('The encryption key returned by the server is invalid.');
+    }
+    const bytes = new Uint8Array(value.length / 2);
+    for (let index = 0; index < value.length; index += 2) {
+        bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
+    }
+    return bytes;
 }
 function uint8ToBase64(arr) {
     let bin = '';
@@ -93,14 +92,10 @@ export default function VaultItemForm({ itemId, onSuccess }) {
             return;
         let cancelled = false;
         apiGet(`/api/v1/vault/items/${itemId}`)
-            .then((res) => {
+            .then(async (res) => {
             if (cancelled)
                 return;
-            const item = res.data;
-            setName(item.name);
-            setCredentialType(item.credential_type);
-            setTagsRaw(item.tags.join(', '));
-            setNotes(item.notes ?? '');
+            await loadExistingItem(res.data);
         })
             .catch(() => {
             if (!cancelled)
@@ -134,6 +129,9 @@ export default function VaultItemForm({ itemId, onSuccess }) {
         setGlobalError('');
         setSubmitting(true);
         try {
+            if (!isUnlocked || !privateKey) {
+                throw new Error('Unlock the vault before creating or editing credentials.');
+            }
             const tags = tagsRaw
                 .split(',')
                 .map((t) => t.trim())
@@ -145,42 +143,27 @@ export default function VaultItemForm({ itemId, onSuccess }) {
                 if (!f.secret)
                     payloadMetadata[f.name] = fieldValues[f.name] ?? '';
             }
-            /* Encrypt secret fields if vault is unlocked */
-            let encryptedPayload;
-            let encryptedDek;
             const secretFields = fields.filter((f) => f.secret);
-            if (secretFields.length > 0 && isUnlocked && privateKey) {
-                /* Get our own public key from server to encrypt the DEK */
-                try {
-                    const meRes = await apiGet('/api/v1/users/me').catch(() => null);
-                    /* Fall back: use the in-memory private key's corresponding public key
-                       by fetching from /auth/public-keys -we need the user_id.
-                       If the endpoint is unavailable, skip encryption gracefully. */
-                    if (meRes) {
-                        const userId = meRes.data.id;
-                        const pkRes = await apiGet(`/api/v1/auth/public-keys/${userId}`);
-                        const pubKey = await importPublicKey(pkRes.data.public_key);
-                        const secretPayload = {};
-                        for (const f of secretFields) {
-                            secretPayload[f.name] = fieldValues[f.name] ?? '';
-                        }
-                        const sealed = await sealItem(secretPayload, pubKey);
-                        encryptedPayload = uint8ToBase64(sealed.encryptedPayload);
-                        encryptedDek = uint8ToBase64(sealed.encryptedDek);
-                    }
-                }
-                catch {
-                    /* Encryption failed -still submit metadata without payload */
-                }
+            const secretPayload = {};
+            for (const field of secretFields) {
+                secretPayload[field.name] = fieldValues[field.name] ?? '';
             }
-            const body = {
+            const metadata = {
                 name,
                 credential_type: credentialType,
                 tags,
-                notes: notes || undefined,
+                notes: notes || null,
                 payload_metadata: payloadMetadata,
-                encrypted_payload: encryptedPayload,
-                encrypted_dek: encryptedDek,
+            };
+            const sealed = isEditMode && itemId
+                ? await sealExistingItem(secretPayload, metadata, itemId)
+                : await sealNewItem(secretPayload, metadata);
+            const body = {
+                encrypted_metadata: uint8ToBase64(sealed.encryptedMetadata),
+                encrypted_payload: uint8ToBase64(sealed.encryptedPayload),
+                ...(sealed.encryptedDek
+                    ? { encrypted_dek: uint8ToBase64(sealed.encryptedDek) }
+                    : {}),
             };
             let resultId;
             if (isEditMode && itemId) {
@@ -208,6 +191,45 @@ export default function VaultItemForm({ itemId, onSuccess }) {
         finally {
             setSubmitting(false);
         }
+    }
+    async function loadExistingItem(item) {
+        if (!privateKey || !item.encrypted_metadata || !item.encrypted_dek) {
+            throw new Error('This is a legacy credential and cannot be automatically decrypted.');
+        }
+        const metadata = await openMetadata(hexToBytes(item.encrypted_metadata), hexToBytes(item.encrypted_dek), privateKey);
+        const loadedName = metadata.name;
+        const loadedType = metadata.credential_type;
+        const loadedTags = metadata.tags;
+        if (typeof loadedName !== 'string' ||
+            typeof loadedType !== 'string' ||
+            !ALL_TYPES.includes(loadedType) ||
+            !Array.isArray(loadedTags) ||
+            !loadedTags.every((tag) => typeof tag === 'string')) {
+            throw new Error('Credential metadata is invalid.');
+        }
+        setName(loadedName);
+        setCredentialType(loadedType);
+        setTagsRaw(loadedTags.join(', '));
+        setNotes(typeof metadata.notes === 'string' ? metadata.notes : '');
+        if (item.encrypted_payload) {
+            const secret = await openItem(hexToBytes(item.encrypted_payload), hexToBytes(item.encrypted_dek), privateKey);
+            const entries = Object.entries(secret);
+            setFieldValues(Object.fromEntries(entries.map(([key, value]) => [key, String(value)])));
+        }
+    }
+    async function sealNewItem(secret, metadata) {
+        const me = await apiGet('/api/v1/users/me');
+        const publicKeyResponse = await apiGet(`/api/v1/auth/public-keys/${me.data.id}`);
+        const publicKey = await importPublicKey(hexToBytes(publicKeyResponse.data.public_key));
+        return sealItem(secret, metadata, publicKey);
+    }
+    async function sealExistingItem(secret, metadata, id) {
+        if (!privateKey)
+            throw new Error('Unlock the vault before editing credentials.');
+        const envelope = await apiGet(`/api/v1/vault/items/${id}/key-envelope`);
+        const dek = await decryptDek(hexToBytes(envelope.data.encrypted_dek), privateKey);
+        const sealed = await sealItemWithDek(secret, metadata, dek);
+        return { ...sealed, encryptedDek: undefined };
     }
     async function handleDelete() {
         if (!itemId)

@@ -1,4 +1,4 @@
-import { openItem } from '../../crypto/envelope';
+import { openItem, openMetadata } from '../../crypto/envelope';
 const MAX_ARCHIVE_ITEMS = 100_000;
 const MAX_ENCODED_BYTES = 64 * 1024;
 function isRecord(value) {
@@ -27,37 +27,43 @@ function isArchiveItem(value) {
     if (!isRecord(value))
         return false;
     return typeof value.id === 'string'
-        && typeof value.name === 'string'
-        && typeof value.credential_type === 'string'
         && (value.parent_item_id === null || typeof value.parent_item_id === 'string')
-        && Array.isArray(value.tags)
-        && value.tags.every((tag) => typeof tag === 'string')
-        && (value.notes === null || typeof value.notes === 'string')
+        && (value.encrypted_metadata === null || typeof value.encrypted_metadata === 'string')
         && (value.encrypted_payload === null || typeof value.encrypted_payload === 'string')
-        && (value.payload_metadata === null || isRecord(value.payload_metadata))
         && (value.encrypted_dek === null || typeof value.encrypted_dek === 'string');
 }
 export async function verifyVaultArchive(value, privateKey) {
-    if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.items)
+    if (!isRecord(value) || value.version !== 2 || !Array.isArray(value.items)
         || value.items.length > MAX_ARCHIVE_ITEMS || !value.items.every(isArchiveItem)) {
         throw new Error('This file is not a supported Vaultnary archive.');
     }
-    const archive = { version: 1, items: value.items };
+    const archive = { version: 2, items: value.items };
     for (const item of archive.items) {
-        if (item.encrypted_payload === null)
+        if (item.encrypted_metadata === null && item.encrypted_payload === null)
             continue;
         if (item.encrypted_dek === null) {
-            throw new Error(`Credential "${item.name}" is missing its encrypted key.`);
+            throw new Error('An encrypted credential is missing its encrypted key.');
         }
-        const encryptedPayload = decodeArchiveBytes(item.encrypted_payload);
         const encryptedDek = decodeArchiveBytes(item.encrypted_dek);
-        if (encryptedPayload.length === 0 || encryptedPayload.length > MAX_ENCODED_BYTES
-            || encryptedDek.length === 0 || encryptedDek.length > MAX_ENCODED_BYTES) {
-            throw new Error(`Credential "${item.name}" has invalid encrypted data size.`);
+        if (encryptedDek.length !== 512 || encryptedDek.length > MAX_ENCODED_BYTES) {
+            throw new Error('An encrypted credential has an invalid encrypted key size.');
         }
-        const decrypted = await openItem(encryptedPayload, encryptedDek, privateKey);
-        if (!isRecord(decrypted)) {
-            throw new Error(`Credential "${item.name}" contains invalid encrypted data.`);
+        if (item.encrypted_metadata !== null) {
+            const encryptedMetadata = decodeArchiveBytes(item.encrypted_metadata);
+            if (encryptedMetadata.length < 29 || encryptedMetadata.length > MAX_ENCODED_BYTES) {
+                throw new Error('An encrypted credential has invalid metadata size.');
+            }
+            await openMetadata(encryptedMetadata, encryptedDek, privateKey);
+        }
+        if (item.encrypted_payload !== null) {
+            const encryptedPayload = decodeArchiveBytes(item.encrypted_payload);
+            if (encryptedPayload.length < 29 || encryptedPayload.length > MAX_ENCODED_BYTES) {
+                throw new Error('An encrypted credential has invalid payload size.');
+            }
+            const decrypted = await openItem(encryptedPayload, encryptedDek, privateKey);
+            if (!isRecord(decrypted)) {
+                throw new Error('An encrypted credential contains invalid data.');
+            }
         }
     }
     return archive;

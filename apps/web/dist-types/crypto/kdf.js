@@ -15,5 +15,10 @@ export async function deriveKey(password, salt) {
         p: 4, // 4 parallelism lanes
         dkLen: 32, // 256-bit output
     });
-    return crypto.subtle.importKey('raw', keyBytes.buffer, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    try {
+        return await crypto.subtle.importKey('raw', keyBytes.buffer, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    }
+    finally {
+        keyBytes.fill(0);
+    }
 }

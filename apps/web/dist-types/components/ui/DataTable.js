@@ -4,7 +4,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 /**
  * Typed, sortable data table with row selection.
  */
-export default function DataTable({ columns, rows, getRowKey, onRowClick, emptyState, selectedKey, caption, }) {
+export default function DataTable({ columns, rows, getRowKey, onRowClick, emptyState, selectedKey, caption, className, }) {
     const [sort, setSort] = useState(null);
     function handleSortClick(col) {
         if (!col.sortable)
@@ -16,7 +16,7 @@ export default function DataTable({ columns, rows, getRowKey, onRowClick, emptyS
             return { key: col.key, direction: 'asc' };
         });
     }
-    return (_jsx("div", { style: { overflowX: 'auto', width: '100%' }, children: _jsxs("table", { style: {
+    return (_jsx("div", { className: ['data-table-scroll', className].filter(Boolean).join(' '), style: { width: '100%' }, children: _jsxs("table", { style: {
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: 'var(--text-sm)',
@@ -56,7 +56,7 @@ export default function DataTable({ columns, rows, getRowKey, onRowClick, emptyS
                                 borderBottom: 'var(--border-card)',
                                 cursor: onRowClick ? 'pointer' : 'default',
                                 backgroundColor: isSelected ? 'rgba(37,99,235,0.06)' : 'transparent',
-                            }, children: columns.map((col) => (_jsx("td", { style: {
+                            }, children: columns.map((col) => (_jsx("td", { "data-label": col.header, style: {
                                     padding: 'var(--space-3)',
                                     verticalAlign: 'middle',
                                 }, children: col.render(row) }, col.key))) }, key));

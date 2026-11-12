@@ -8,12 +8,19 @@ const RSA_PARAMS = {
     publicExponent: new Uint8Array([1, 0, 1]), // 65537
     hash: 'SHA-256',
 };
-/** Generate a new RSA-OAEP-4096 key pair. Both keys are non-extractable. */
+/** Generate a key pair for initialization; persist only the public key and encrypted PKCS8 private key. */
 export async function generateKekPair() {
-    return crypto.subtle.generateKey(RSA_PARAMS, false /* non-extractable */, [
+    return crypto.subtle.generateKey(RSA_PARAMS, true, [
         'encrypt',
         'decrypt',
     ]);
+}
+export async function exportPrivateKey(privateKey) {
+    return new Uint8Array(await crypto.subtle.exportKey('pkcs8', privateKey));
+}
+export async function importPrivateKey(pkcs8Bytes) {
+    const buffer = pkcs8Bytes.buffer.slice(pkcs8Bytes.byteOffset, pkcs8Bytes.byteOffset + pkcs8Bytes.byteLength);
+    return crypto.subtle.importKey('pkcs8', buffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['decrypt']);
 }
 /**
  * Encrypt (wrap) a DEK with a recipient's RSA public key.

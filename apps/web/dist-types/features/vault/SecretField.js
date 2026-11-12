@@ -29,10 +29,10 @@ export default function SecretField({ itemId, label, value: preloadedValue }) {
     const clipboardTimer = useRef(null);
     /* When itemId or preloadedValue changes, reset decrypted state */
     useEffect(() => {
-        setDecryptedValue(preloadedValue);
+        setDecryptedValue(isUnlocked ? preloadedValue : undefined);
         setRevealed(false);
         clearMaskTimer();
-    }, [itemId, preloadedValue]);
+    }, [itemId, preloadedValue, isUnlocked, privateKey]);
     function clearMaskTimer() {
         if (maskTimer.current) {
             clearTimeout(maskTimer.current);
@@ -51,7 +51,10 @@ export default function SecretField({ itemId, label, value: preloadedValue }) {
             setDecrypting(true);
             const res = await apiGet(`/api/v1/vault/items/${itemId}/key-envelope`);
             const { encrypted_payload, encrypted_dek } = res.data;
-            /* Convert hex/base64 strings to Uint8Array */
+            if (!encrypted_payload || !encrypted_dek) {
+                throw new Error('This legacy credential has no recoverable encrypted secret.');
+            }
+            /* Convert the server's hex ciphertexts to Uint8Array */
             const payloadBytes = hexOrBase64ToBytes(encrypted_payload);
             const dekBytes = hexOrBase64ToBytes(encrypted_dek);
             const secret = await openItem(payloadBytes, dekBytes, privateKey);
@@ -169,11 +172,5 @@ function hexOrBase64ToBytes(s) {
         }
         return buf;
     }
-    /* Base64 */
-    const bin = atob(s);
-    const buf = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) {
-        buf[i] = bin.charCodeAt(i);
-    }
-    return buf;
+    throw new Error('Encrypted credential data is invalid.');
 }

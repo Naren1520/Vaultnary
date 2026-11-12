@@ -309,6 +309,165 @@ pub async fn create_item(
         .into_response())
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct EnvImportRequest {
+    items: Vec<EncryptedEnvItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EncryptedEnvItem {
+    encrypted_metadata: String,
+    encrypted_payload: String,
+    encrypted_dek: String,
+}
+
+struct ValidatedEnvItem {
+    encrypted_metadata: Vec<u8>,
+    encrypted_payload: Vec<u8>,
+    encrypted_dek: Vec<u8>,
+}
+
+/* POST /api/v1/vault/import-env */
+pub(super) async fn import_env(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Json(body): Json<EnvImportRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    const MAX_ENV_ITEMS: usize = 100;
+    if body.items.is_empty() || body.items.len() > MAX_ENV_ITEMS {
+        return Err(ApiError::with_details(
+            AppError::UnprocessableEntity("Invalid environment import.".into()),
+            vec![ErrorDetail {
+                field: "items".into(),
+                rule: "must_contain_between_1_and_100_items".into(),
+            }],
+        ));
+    }
+
+    let mut validated_items = Vec::with_capacity(body.items.len());
+    for (index, item) in body.items.into_iter().enumerate() {
+        let decode_field = |field: &str, encoded: &str, min_bytes: usize, max_bytes: usize| {
+            let bytes = decode_base64_or_hex(encoded)
+                .filter(|bytes| (min_bytes..=max_bytes).contains(&bytes.len()));
+            bytes.ok_or_else(|| {
+                ApiError::with_details(
+                    AppError::UnprocessableEntity("Invalid encrypted environment variable.".into()),
+                    vec![ErrorDetail {
+                        field: format!("items[{index}].{field}"),
+                        rule: "invalid_encrypted_length_or_encoding".into(),
+                    }],
+                )
+            })
+        };
+        validated_items.push(ValidatedEnvItem {
+            encrypted_metadata: decode_field(
+                "encrypted_metadata",
+                &item.encrypted_metadata,
+                29,
+                MAX_PAYLOAD_BYTES,
+            )?,
+            encrypted_payload: decode_field(
+                "encrypted_payload",
+                &item.encrypted_payload,
+                29,
+                MAX_PAYLOAD_BYTES,
+            )?,
+            encrypted_dek: decode_field("encrypted_dek", &item.encrypted_dek, 512, 512)?,
+        });
+    }
+
+    let db = state.db();
+    let key_material_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM vault_key_material WHERE user_id = $1)")
+            .bind(auth.user_id)
+            .fetch_one(db)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    if !key_material_exists {
+        return Err(ApiError::new(AppError::Conflict(
+            "Initialize and unlock your encrypted vault before importing environment variables."
+                .into(),
+        )));
+    }
+
+    let vault_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM vaults WHERE owner_id = $1 LIMIT 1")
+            .bind(auth.user_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let vault_id = vault_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+
+    let now = OffsetDateTime::now_utc();
+    let mut tx = db
+        .begin()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    for item in &validated_items {
+        let item_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO vault_items
+             (id, vault_id, name, credential_type, parent_item_id, tags, encrypted_payload,
+              payload_metadata, notes, encrypted_metadata, created_at, updated_at)
+             VALUES ($1, $2, 'Encrypted credential', 'custom', NULL, '{}', $3, NULL, NULL, $4, $5, $5)",
+        )
+        .bind(item_id)
+        .bind(vault_id)
+        .bind(&item.encrypted_payload)
+        .bind(&item.encrypted_metadata)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+        sqlx::query(
+            "INSERT INTO credential_permissions (id, item_id, user_id, role, created_at)
+             VALUES ($1, $2, $3, 'owner', $4)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(item_id)
+        .bind(auth.user_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+        sqlx::query(
+            "INSERT INTO credential_key_envelopes (id, item_id, user_id, encrypted_dek, created_at)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(item_id)
+        .bind(auth.user_id)
+        .bind(&item.encrypted_dek)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+
+    insert_audit(
+        db,
+        auth.user_id,
+        "item.imported",
+        None,
+        Some("env_import"),
+        serde_json::json!({ "count": validated_items.len() }),
+    )
+    .await;
+
+    Ok(Json(serde_json::json!({
+        "data": { "imported": validated_items.len() }
+    })))
+}
+
 /* GET /api/v1/vault/items                                             */
 
 #[derive(Deserialize)]
@@ -1445,7 +1604,9 @@ pub(super) fn decode_base64_or_hex(s: &str) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod archive_tests {
-    use super::{decode_base64_or_hex, validate_archive, ArchiveItem, VaultArchive};
+    use super::{
+        decode_base64_or_hex, validate_archive, ArchiveItem, EnvImportRequest, VaultArchive,
+    };
     use uuid::Uuid;
 
     fn archive_item(id: Uuid, parent_item_id: Option<Uuid>) -> ArchiveItem {
@@ -1469,6 +1630,32 @@ mod archive_tests {
             ],
         };
         assert!(validate_archive(archive).is_ok());
+    }
+
+    #[test]
+    fn env_import_request_rejects_plaintext_fields() {
+        let request = serde_json::json!({
+            "items": [{
+                "encrypted_metadata": "ciphertext",
+                "encrypted_payload": "ciphertext",
+                "encrypted_dek": "wrapped-key",
+                "name": "DATABASE_URL",
+                "value": "must-not-be-sent"
+            }]
+        });
+        assert!(serde_json::from_value::<EnvImportRequest>(request).is_err());
+    }
+
+    #[test]
+    fn env_import_request_accepts_only_encrypted_item_fields() {
+        let request = serde_json::json!({
+            "items": [{
+                "encrypted_metadata": "ciphertext",
+                "encrypted_payload": "ciphertext",
+                "encrypted_dek": "wrapped-key"
+            }]
+        });
+        assert!(serde_json::from_value::<EnvImportRequest>(request).is_ok());
     }
 
     #[test]

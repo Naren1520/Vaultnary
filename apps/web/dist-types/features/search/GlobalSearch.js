@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import CredentialBadge from '../../components/ui/CredentialBadge';
 import SkeletonLoader from '../../components/ui/SkeletonLoader';
 import { apiGet } from '../../services/http-client';
+import { useVaultStore } from '../../state/vault-store';
+import { decryptVaultMetadata } from '../vault/metadata';
 const DEBOUNCE_MS = 300;
 /**
  * Global search dropdown.
@@ -15,46 +17,57 @@ const DEBOUNCE_MS = 300;
  */
 export default function GlobalSearch({ query, onQueryChange }) {
     const navigate = useNavigate();
+    const { isUnlocked: isVaultUnlocked, privateKey } = useVaultStore();
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const containerRef = useRef(null);
     /* Debounced search */
     useEffect(() => {
-        if (!query.trim()) {
+        if (!isVaultUnlocked || !privateKey || !query.trim()) {
             setResults([]);
             setOpen(false);
+            setLoading(false);
             return;
         }
         setLoading(true);
         setOpen(true);
-        const timer = setTimeout(() => {
-            let cancelled = false;
-            const ctrl = new AbortController();
-            apiGet(`/api/v1/vault/search?q=${encodeURIComponent(query.trim())}`, {
-                signal: ctrl.signal,
-            })
-                .then((res) => {
+        let cancelled = false;
+        const ctrl = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const res = await apiGet(`/api/v1/vault/search?q=${encodeURIComponent(query.trim())}`, { signal: ctrl.signal });
+                const decrypted = await Promise.all(res.data.map((item) => decryptVaultMetadata(item, privateKey)));
                 if (cancelled)
                     return;
-                setResults(res.data);
-                setOpen(res.data.length > 0);
-            })
-                .catch(() => {
+                const search = query.trim().toLocaleLowerCase();
+                const matches = decrypted
+                    .filter((item) => !item.legacy)
+                    .filter((item) => [item.name, item.credential_type, ...item.tags]
+                    .some((value) => value.toLocaleLowerCase().includes(search)))
+                    .map(({ id, name, credential_type }) => ({
+                    id,
+                    name,
+                    credential_type,
+                }));
+                setResults(matches);
+                setOpen(matches.length > 0);
+            }
+            catch {
                 if (!cancelled)
                     setResults([]);
-            })
-                .finally(() => {
+            }
+            finally {
                 if (!cancelled)
                     setLoading(false);
-            });
-            return () => {
-                cancelled = true;
-                ctrl.abort();
-            };
+            }
         }, DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-    }, [query]);
+        return () => {
+            cancelled = true;
+            ctrl.abort();
+            clearTimeout(timer);
+        };
+    }, [isVaultUnlocked, privateKey, query]);
     /* Close dropdown when clicking outside */
     useEffect(() => {
         function handleClickOutside(e) {
@@ -77,6 +90,17 @@ export default function GlobalSearch({ query, onQueryChange }) {
         }
     }
     const showDropdown = open && query.trim().length > 0;
+    if (!isVaultUnlocked) {
+        return (_jsx("input", { type: "search", value: "", disabled: true, placeholder: "Unlock vault to search", "aria-label": "Unlock the vault to search", style: {
+                width: '100%',
+                padding: 'var(--space-1) var(--space-3)',
+                border: 'var(--border-input)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--text-sm)',
+                backgroundColor: 'var(--color-bg-subtle)',
+                color: 'var(--color-text-muted)',
+            } }));
+    }
     return (_jsxs("div", { ref: containerRef, className: "global-search", children: [_jsx("input", { type: "search", value: query, onChange: (e) => onQueryChange(e.target.value), onKeyDown: handleKeyDown, onFocus: () => { if (results.length > 0)
                     setOpen(true); }, placeholder: "Search vault\u2026", "aria-label": "Search vault", "aria-expanded": showDropdown, "aria-haspopup": "listbox", style: {
                     width: '100%',

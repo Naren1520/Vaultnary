@@ -26,12 +26,29 @@ export async function generateDek() {
  * The caller uploads both blobs to the server -the server never sees
  * either in plaintext.
  */
-export async function sealItem(secret, ownerPublicKey) {
+export async function sealItem(secret, metadata, ownerPublicKey) {
     const dek = await generateDek();
     const plaintext = new TextEncoder().encode(JSON.stringify(secret));
     const encryptedPayload = await encrypt(dek, plaintext);
+    const encryptedMetadata = await encrypt(dek, new TextEncoder().encode(JSON.stringify(metadata)));
     const encryptedDek = await encryptDek(dek, ownerPublicKey);
-    return { encryptedPayload, encryptedDek };
+    return { encryptedPayload, encryptedMetadata, encryptedDek };
+}
+export async function sealItemWithDek(secret, metadata, dek) {
+    const [encryptedPayload, encryptedMetadata] = await Promise.all([
+        encrypt(dek, new TextEncoder().encode(JSON.stringify(secret))),
+        encrypt(dek, new TextEncoder().encode(JSON.stringify(metadata))),
+    ]);
+    return { encryptedPayload, encryptedMetadata };
+}
+export async function openMetadata(encryptedMetadata, encryptedDek, privateKey) {
+    const dek = await decryptDek(encryptedDek, privateKey);
+    const plaintext = await decrypt(dek, encryptedMetadata);
+    const value = JSON.parse(new TextDecoder().decode(plaintext));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('Credential metadata is invalid.');
+    }
+    return value;
 }
 /**
  * Unseal a vault item secret.

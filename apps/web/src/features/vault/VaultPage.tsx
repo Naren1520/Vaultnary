@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useRef, useState, type ChangeEvent } from 'react'
 import { Download, Plus, Upload } from 'lucide-react'
 import Topbar from '../../components/ui/Topbar'
 import Inspector from '../../components/ui/Inspector'
@@ -9,6 +9,7 @@ import VaultUnlockScreen from './VaultUnlockScreen'
 import VaultList from './VaultList'
 import VaultItemForm from '../../components/forms/VaultItemForm'
 import { verifyVaultArchive, type VaultArchive } from './archive'
+import EnvImportDialog from './env-import/EnvImportDialog'
 
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024
 
@@ -31,6 +32,7 @@ export default function VaultPage() {
   const privateKey = useVaultStore((s) => s.privateKey)
   const [, forceUpdate] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
+  const [showEnvImport, setShowEnvImport] = useState(false)
   const [listKey, setListKey] = useState(0)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [archiveError, setArchiveError] = useState('')
@@ -102,6 +104,15 @@ export default function VaultPage() {
     if (id) setListKey((k) => k + 1) // re-mount VaultList to refresh
   }
 
+  const handleEnvImportClose = useCallback(() => setShowEnvImport(false), [])
+  const handleEnvImported = useCallback((count: number) => {
+    setListKey((key) => key + 1)
+    if (count > 0) {
+      setArchiveNotice(`${count} environment variable${count === 1 ? '' : 's'} encrypted and imported.`)
+      setArchiveError('')
+    }
+  }, [])
+
   if (!isUnlocked) {
     return <VaultUnlockScreen onUnlocked={handleUnlocked} />
   }
@@ -123,7 +134,15 @@ export default function VaultPage() {
               style={actionStyle}
             >
               <Upload size={14} aria-hidden="true" />
-              Import
+              Import backup
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEnvImport(true)}
+              style={actionStyle}
+            >
+              <Upload size={14} aria-hidden="true" />
+              Import .env
             </button>
             <input
               ref={fileInput}
@@ -230,6 +249,12 @@ export default function VaultPage() {
             <VaultItemForm onSuccess={handleCreated} />
           </div>
         </div>
+      )}
+      {showEnvImport && (
+        <EnvImportDialog
+          onClose={handleEnvImportClose}
+          onImported={handleEnvImported}
+        />
       )}
     </div>
   )

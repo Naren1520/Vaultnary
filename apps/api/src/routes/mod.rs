@@ -126,6 +126,18 @@ fn v1_routes() -> Router<AppState> {
         )
         // --- Vault Items ---
         .route("/vault/items", post(vaults::create_item))
+        .route(
+            "/vault/import-env",
+            post(vaults::import_env)
+                .layer::<_, std::convert::Infallible>(DefaultBodyLimit::max(12 * 1024 * 1024))
+                .layer::<_, std::convert::Infallible>(RateLimitLayer::new(
+                    InMemoryStore::new(),
+                    RateLimitConfig {
+                        window: Duration::from_secs(60),
+                        max_requests: 5,
+                    },
+                )),
+        )
         .route("/vault/items", get(vaults::list_items))
         .route("/vault/items/:item_id", get(vaults::get_item))
         .route("/vault/items/:item_id", put(vaults::update_item))
