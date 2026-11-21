@@ -27,6 +27,7 @@ Vaultnary uses PostgreSQL 16 with sequential SQL migrations. All tables use UUID
 | 014_email_outbox.sql | `email_outbox` |
 | 015_account_audit_purge.sql | Narrowly scoped audit-event purge function for account deletion |
 | 016_vault_key_material.sql | Encrypted vault private-key material and encrypted credential metadata |
+| 017_account_request_metrics.sql | Per-account minute-bucket request activity |
 
 ---
 
@@ -349,6 +350,26 @@ Key points:
 - Account deletion runs its audit cleanup in the same transaction as the account removal; the database role used by the API must have the required scoped DELETE permission or deletion will fail atomically.
 - `(actor_id, created_at DESC)` index supports fast per-user timeline queries
 
+### account_request_metrics
+
+Aggregated authenticated API activity, grouped by account and minute for the Security monitoring dashboard.
+
+```sql
+CREATE TABLE account_request_metrics (
+    user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bucket_start   TIMESTAMPTZ NOT NULL,
+    read_requests  BIGINT      NOT NULL DEFAULT 0,
+    write_requests BIGINT      NOT NULL DEFAULT 0,
+    error_requests BIGINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, bucket_start)
+);
+```
+
+Key points:
+- Stores counts, not request payloads, paths, or IP addresses; dashboard and speed-test requests are excluded from the counters.
+- The dashboard aggregates these minute buckets into hourly values for the last 24 hours and removes that account's buckets older than 30 days when opened.
+- Account deletion removes these rows through the user foreign-key cascade.
+
 ### email_outbox
 
 Stores account-lifecycle notifications until Resend confirms delivery.
@@ -392,5 +413,6 @@ users
  │    └── services (1:N)
  ├── user_public_keys (1:N)
  ├── recovery_material (1:1, unique)
- └── audit_events (as actor_id)
+ ├── audit_events (as actor_id)
+ └── account_request_metrics (1:N)
 ```

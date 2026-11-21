@@ -21,7 +21,7 @@ const columns: Column<AuditEvent>[] = [
   { key: 'created_at', header: 'Time', sortable: true, render: (r) => <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{new Date(r.created_at).toLocaleString()}</span>, width: '11rem' },
 ]
 
-export default function AuditLogPage() {
+export function AuditLogPanel() {
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [actionFilter, setActionFilter] = useState('')
@@ -40,6 +40,34 @@ export default function AuditLogPage() {
     : events
 
   return (
+    <>
+      <div className="audit-filter">
+        <label htmlFor="action-filter" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Filter by action</label>
+        <input
+          id="action-filter"
+          type="text"
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          placeholder="e.g. user.login"
+          className="audit-filter-input"
+        />
+      </div>
+
+      {loading
+        ? <SkeletonLoader variant="table-row" rows={8} />
+        : <DataTable
+            columns={columns}
+            rows={filtered}
+            getRowKey={(r) => r.id}
+            caption="Audit events"
+            emptyState={<EmptyState title="No audit events" message="Security events will appear here." />}
+          />}
+    </>
+  )
+}
+
+export default function AuditLogPage() {
+  return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Topbar breadcrumbs={[{ label: 'Audit Log', href: '/app/audit' }]} />
       <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
@@ -48,28 +76,7 @@ export default function AuditLogPage() {
           <h1>Audit log</h1>
           <p>Review security and account events recorded for your workspace.</p>
         </header>
-        {/* Filters */}
-        <div className="audit-filter">
-          <label htmlFor="action-filter" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Filter by action</label>
-          <input
-            id="action-filter"
-            type="text"
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            placeholder="e.g. user.login"
-            className="audit-filter-input"
-          />
-        </div>
-
-        {loading
-          ? <SkeletonLoader variant="table-row" rows={8} />
-          : <DataTable
-              columns={columns}
-              rows={filtered}
-              getRowKey={(r) => r.id}
-              caption="Audit events"
-              emptyState={<EmptyState title="No audit events" message="Security events will appear here." />}
-            />}
+        <AuditLogPanel />
       </div>
     </div>
   )

@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Topbar from '../../components/ui/Topbar'
 import DataTable, { Column } from '../../components/ui/DataTable'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import EmptyState from '../../components/feedback/EmptyState'
 import { apiGet, apiDelete } from '../../services/http-client'
 import type { SessionRecord } from '../auth/types'
+import { AuditLogPanel } from '../audit/AuditLogPage'
+import MonitoringPanel from './MonitoringPanel'
 
 export default function SecurityCenterPage() {
   const [sessions, setSessions] = useState<SessionRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const activeTab = requestedTab === 'audit' || requestedTab === 'monitoring' ? requestedTab : 'sessions'
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -48,12 +54,56 @@ export default function SecurityCenterPage() {
       <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }}>
         <header className="app-page-heading">
           <p className="app-page-heading__eyebrow">Account protection</p>
-          <h1>Active sessions</h1>
-          <p>Review devices signed in to your account and revoke access you no longer recognize.</p>
+          <h1>Security</h1>
+          <p>Review sessions, activity, and your connection to Vaultnary.</p>
         </header>
-        {loading
-          ? <SkeletonLoader variant="table-row" rows={4} />
-          : <DataTable columns={columns} rows={sessions} getRowKey={(r) => r.id} caption="Active sessions" emptyState={<EmptyState title="No active sessions" />} />}
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+          <button
+            type="button"
+            aria-pressed={activeTab === 'sessions'}
+            onClick={() => setSearchParams((current) => {
+              const next = new URLSearchParams(current)
+              next.delete('tab')
+              return next
+            })}
+            style={{ padding: 'var(--space-2) var(--space-3)', border: 0, borderBottom: activeTab === 'sessions' ? '2px solid var(--color-accent)' : '2px solid transparent', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer' }}
+          >
+            Active sessions
+          </button>
+          <button
+            type="button"
+            aria-pressed={activeTab === 'audit'}
+            onClick={() => setSearchParams((current) => {
+              const next = new URLSearchParams(current)
+              next.set('tab', 'audit')
+              return next
+            })}
+            style={{ padding: 'var(--space-2) var(--space-3)', border: 0, borderBottom: activeTab === 'audit' ? '2px solid var(--color-accent)' : '2px solid transparent', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer' }}
+          >
+            Audit log
+          </button>
+          <button
+            type="button"
+            aria-pressed={activeTab === 'monitoring'}
+            onClick={() => setSearchParams((current) => {
+              const next = new URLSearchParams(current)
+              next.set('tab', 'monitoring')
+              return next
+            })}
+            style={{ padding: 'var(--space-2) var(--space-3)', border: 0, borderBottom: activeTab === 'monitoring' ? '2px solid var(--color-accent)' : '2px solid transparent', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer' }}
+          >
+            Monitoring
+          </button>
+        </div>
+        <section>
+          {activeTab === 'audit'
+            ? <AuditLogPanel />
+            : activeTab === 'monitoring'
+              ? <MonitoringPanel />
+              : loading
+              ? <SkeletonLoader variant="table-row" rows={4} />
+              : <DataTable columns={columns} rows={sessions} getRowKey={(r) => r.id} caption="Active sessions" emptyState={<EmptyState title="No active sessions" />} />}
+        </section>
       </div>
     </div>
   )

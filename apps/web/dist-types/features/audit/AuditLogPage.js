@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
 import Topbar from '../../components/ui/Topbar';
 import DataTable from '../../components/ui/DataTable';
@@ -11,7 +11,7 @@ const columns = [
     { key: 'ip_address', header: 'IP', render: (r) => _jsx("span", { style: { fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: r.ip_address ?? '-' }), width: '9rem' },
     { key: 'created_at', header: 'Time', sortable: true, render: (r) => _jsx("span", { style: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }, children: new Date(r.created_at).toLocaleString() }), width: '11rem' },
 ];
-export default function AuditLogPage() {
+export function AuditLogPanel() {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionFilter, setActionFilter] = useState('');
@@ -26,7 +26,10 @@ export default function AuditLogPage() {
     const filtered = actionFilter
         ? events.filter((e) => e.action_type.includes(actionFilter.toLowerCase()))
         : events;
-    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Audit Log', href: '/app/audit' }] }), _jsxs("div", { className: "app-page-content", style: { padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Workspace activity" }), _jsx("h1", { children: "Audit log" }), _jsx("p", { children: "Review security and account events recorded for your workspace." })] }), _jsxs("div", { className: "audit-filter", children: [_jsx("label", { htmlFor: "action-filter", style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }, children: "Filter by action" }), _jsx("input", { id: "action-filter", type: "text", value: actionFilter, onChange: (e) => setActionFilter(e.target.value), placeholder: "e.g. user.login", className: "audit-filter-input" })] }), loading
-                        ? _jsx(SkeletonLoader, { variant: "table-row", rows: 8 })
-                        : _jsx(DataTable, { columns: columns, rows: filtered, getRowKey: (r) => r.id, caption: "Audit events", emptyState: _jsx(EmptyState, { title: "No audit events", message: "Security events will appear here." }) })] })] }));
+    return (_jsxs(_Fragment, { children: [_jsxs("div", { className: "audit-filter", children: [_jsx("label", { htmlFor: "action-filter", style: { fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }, children: "Filter by action" }), _jsx("input", { id: "action-filter", type: "text", value: actionFilter, onChange: (e) => setActionFilter(e.target.value), placeholder: "e.g. user.login", className: "audit-filter-input" })] }), loading
+                ? _jsx(SkeletonLoader, { variant: "table-row", rows: 8 })
+                : _jsx(DataTable, { columns: columns, rows: filtered, getRowKey: (r) => r.id, caption: "Audit events", emptyState: _jsx(EmptyState, { title: "No audit events", message: "Security events will appear here." }) })] }));
+}
+export default function AuditLogPage() {
+    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Audit Log', href: '/app/audit' }] }), _jsxs("div", { className: "app-page-content", style: { padding: 'var(--space-4)', flex: 1, overflowY: 'auto' }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Workspace activity" }), _jsx("h1", { children: "Audit log" }), _jsx("p", { children: "Review security and account events recorded for your workspace." })] }), _jsx(AuditLogPanel, {})] })] }));
 }

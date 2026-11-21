@@ -24,7 +24,6 @@ const ProjectDetail = lazy(() => import('../features/projects/ProjectDetail'));
 const ServicesPage = lazy(() => import('../features/services/ServicesPage'));
 const ServiceDetail = lazy(() => import('../features/services/ServiceDetail'));
 const SecurityCenterPage = lazy(() => import('../features/security-center/SecurityCenterPage'));
-const AuditLogPage = lazy(() => import('../features/audit/AuditLogPage'));
 const WorkspacesPage = lazy(() => import('../features/workspaces/WorkspacesPage'));
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage'));
 function ProtectedRoute() {
@@ -80,7 +79,7 @@ export const router = createBrowserRouter([
                     { path: 'services/:serviceId', element: wrap(ServiceDetail) },
                     { path: 'workspaces', element: wrap(WorkspacesPage) },
                     { path: 'security', element: wrap(SecurityCenterPage) },
-                    { path: 'audit', element: wrap(AuditLogPage) },
+                    { path: 'audit', element: _jsx(Navigate, { to: "/app/security?tab=audit", replace: true }) },
                     { path: 'profile', element: wrap(ProfilePage) },
                 ],
             },

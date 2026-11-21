@@ -113,9 +113,47 @@ where
             // Look up the session by token hash.
             match lookup_session(&db, &token_hash).await {
                 Ok(Some(auth_user)) => {
+                    let user_id = auth_user.user_id;
+                    let method = req.method().clone();
+                    let path = req.uri().path().to_owned();
+                    let track_request = path.starts_with("/api/v1/")
+                        && path != "/api/v1/security/monitoring"
+                        && path != "/api/v1/security/speed-test";
+
                     // Valid session -attach to request extensions.
                     req.extensions_mut().insert(auth_user);
-                    inner.call(req).await
+                    let response = inner.call(req).await?;
+
+                    if track_request {
+                        let is_read =
+                            matches!(method, axum::http::Method::GET | axum::http::Method::HEAD);
+                        let status = response.status();
+                        let result = sqlx::query(
+                            "INSERT INTO account_request_metrics
+                                (user_id, bucket_start, read_requests, write_requests, error_requests)
+                             VALUES ($1, date_trunc('minute', NOW()), $2, $3, $4)
+                             ON CONFLICT (user_id, bucket_start) DO UPDATE SET
+                                read_requests = account_request_metrics.read_requests + EXCLUDED.read_requests,
+                                write_requests = account_request_metrics.write_requests + EXCLUDED.write_requests,
+                                error_requests = account_request_metrics.error_requests + EXCLUDED.error_requests",
+                        )
+                        .bind(user_id)
+                        .bind(if is_read { 1_i64 } else { 0 })
+                        .bind(if is_read { 0_i64 } else { 1 })
+                        .bind(if status.is_client_error() || status.is_server_error() {
+                            1_i64
+                        } else {
+                            0
+                        })
+                        .execute(&db)
+                        .await;
+
+                        if let Err(err) = result {
+                            tracing::error!(%err, %user_id, "Failed to record account API request metric");
+                        }
+                    }
+
+                    Ok(response)
                 }
                 Ok(None) => {
                     // Invalid, expired, or revoked session -return 401 and clear cookie.

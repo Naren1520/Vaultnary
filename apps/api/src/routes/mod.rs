@@ -14,6 +14,7 @@ pub mod auth;
 pub mod contact;
 pub mod credentials;
 pub mod hierarchy;
+pub mod monitoring;
 pub mod projects;
 pub mod recovery;
 pub mod services;
@@ -219,6 +220,8 @@ fn v1_routes() -> Router<AppState> {
         )
         // --- Sessions (security center alias) ---
         .route("/security/sessions", get(sessions::list_sessions))
+        .route("/security/monitoring", get(monitoring::account_metrics))
+        .route("/security/speed-test", get(monitoring::speed_test))
         .route("/security/events", get(sessions::security_events))
         .route("/security/invitations", get(sessions::security_invitations))
         .route("/security/shared-with-me", get(sessions::shared_with_me))
