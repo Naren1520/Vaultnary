@@ -167,9 +167,9 @@ export default function LandingPage() {
                   <Link to="/register" className="lp-button">
                     Create your workspace <ArrowRight size={17} />
                   </Link>
-                  <a href="#product" className="lp-text-link">
-                    Explore the product <ChevronRight size={16} />
-                  </a>
+                  <Link to="/manual" className="lp-text-link">
+                    Manual <ArrowRight size={16} />
+                  </Link>
                 </div>
                 <div className="lp-hero__note">
                   <ShieldCheck size={17} />
@@ -418,6 +418,7 @@ export default function LandingPage() {
             </div>
             <nav className="lp-footer__column" aria-label="Explore Vaultnary">
               <h2>Explore</h2>
+              <Link to="/manual">Manual</Link>
               <a href="#product">Product</a>
               <a href="#workspaces">Workspaces</a>
               <a href="#how-it-works">How it works</a>

@@ -15,6 +15,7 @@ const SecurityOverviewPage = lazy(() => import('../features/legal/SecurityOvervi
 const ContactPage = lazy(() => import('../features/company/ContactPage'))
 const SupportPage = lazy(() => import('../features/company/SupportPage'))
 const AboutPage = lazy(() => import('../features/company/AboutPage'))
+const ManualPage = lazy(() => import('../features/manual/ManualPage'))
 const AppShell = lazy(() => import('../features/shell/AppShell'))
 const VaultPage = lazy(() => import('../features/vault/VaultPage'))
 const VaultsPage = lazy(() => import('../features/vault/VaultsPage'))
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
   { path: '/contact', element: wrap(ContactPage) },
   { path: '/support', element: wrap(SupportPage) },
   { path: '/about', element: wrap(AboutPage) },
+  { path: '/manual', element: wrap(ManualPage) },
 
   // Authenticated app
   {

@@ -57,6 +57,7 @@ export default function PublicSiteLayout({
             </div>
             <nav className="public-footer__column" aria-label="Explore Vaultnary">
               <h2>Explore</h2>
+              <Link to="/manual">Manual</Link>
               <Link to="/#product">Product</Link>
               <Link to="/#workspaces">Workspaces</Link>
               <Link to="/#how-it-works">How it works</Link>
