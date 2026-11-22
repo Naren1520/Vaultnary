@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { ArrowRight, Server } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Topbar from '../../components/ui/Topbar'
-import DataTable, { Column } from '../../components/ui/DataTable'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import EmptyState from '../../components/feedback/EmptyState'
 import { useToast } from '../../components/ui/Toast'
@@ -14,7 +14,7 @@ interface Service {
   name: string
   environment: string
   description: string | null
-  project_id: string | null
+  project_id: string
   created_at: string
 }
 
@@ -32,14 +32,10 @@ interface Project {
 
 const environments = ['development', 'staging', 'production', 'custom'] as const
 
-const columns: Column<Service>[] = [
-  { key: 'name', header: 'Name', sortable: true, render: (r) => <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{r.name}</span> },
-  { key: 'environment', header: 'Environment', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.environment}</span>, width: '8rem' },
-  { key: 'description', header: 'Description', render: (r) => <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{r.description ?? '-'}</span> },
-]
-
 export default function ServicesPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedProjectId = searchParams.get('project_id')
   const { showToast } = useToast()
   const [services, setServices] = useState<Service[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -60,6 +56,18 @@ export default function ServicesPage() {
     () => projects.filter((project) => project.workspace_id === workspaceId),
     [projects, workspaceId],
   )
+  const requestedProject = projects.find((project) => project.id === requestedProjectId)
+  const requestedWorkspace = workspaces.find(
+    (workspace) => workspace.id === requestedProject?.workspace_id,
+  )
+  const visibleServices = requestedProjectId
+    ? services.filter((service) => service.project_id === requestedProjectId)
+    : services
+  const canCreate = requestedProjectId
+    ? Boolean(requestedProject && editableWorkspaces.some(
+      (workspace) => workspace.id === requestedProject.workspace_id,
+    ))
+    : false
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -72,10 +80,28 @@ export default function ServicesPage() {
         setServices(serviceResponse.data)
         setWorkspaces(workspaceResponse.data)
         setProjects(projectResponse.data)
+        const requestedProject = projectResponse.data.find(
+          (project) => project.id === requestedProjectId,
+        )
+        const editableRequestedProject =
+          requestedProject && workspaceResponse.data.some(
+            (workspace) => workspace.id === requestedProject.workspace_id && workspace.role !== 'viewer',
+          )
+            ? requestedProject
+            : undefined
         setWorkspaceId((current) =>
           current && workspaceResponse.data.some(({ id }) => id === current)
             ? current
-            : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '',
+            : editableRequestedProject
+              ? editableRequestedProject.workspace_id
+              : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '',
+        )
+        setProjectId((current) =>
+          current && projectResponse.data.some(({ id }) => id === current)
+            ? current
+            : editableRequestedProject
+              ? editableRequestedProject.id
+              : '',
         )
       })
       .catch((cause: unknown) => {
@@ -87,19 +113,23 @@ export default function ServicesPage() {
         if (!ctrl.signal.aborted) setLoading(false)
       })
     return () => ctrl.abort()
-  }, [])
+  }, [requestedProjectId])
 
   useEffect(() => {
-    if (projectId && !workspaceProjects.some((project) => project.id === projectId)) {
-      setProjectId('')
+    if (!requestedProjectId && !workspaceProjects.some((project) => project.id === projectId)) {
+      setProjectId(workspaceProjects[0]?.id ?? '')
     }
-  }, [projectId, workspaceProjects])
+  }, [projectId, requestedProjectId, workspaceProjects])
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmedName = name.trim()
-    if (!trimmedName || !workspaceId) {
-      setError(!trimmedName ? 'Enter a service name.' : 'Choose a workspace where you can edit.')
+    if (!trimmedName || !workspaceId || !projectId) {
+      setError(
+        !trimmedName
+          ? 'Enter a service name.'
+          : 'The project context is missing. Open this page from a project.',
+      )
       return
     }
 
@@ -111,13 +141,10 @@ export default function ServicesPage() {
         description: description.trim() || null,
         environment,
         workspace_id: workspaceId,
-        project_id: projectId || null,
+        project_id: projectId,
       })
-      setServices((current) => [response.data, ...current])
-      setName('')
-      setDescription('')
-      setProjectId('')
       showToast({ message: 'Service created', type: 'success' })
+      navigate(`/app/services/${response.data.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create service.')
     } finally {
@@ -126,83 +153,146 @@ export default function ServicesPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Topbar breadcrumbs={[{ label: 'Services', href: '/app/services' }]} />
-      <div className="app-page-content" style={{ padding: 'var(--space-4)', flex: 1 }}>
+    <div className="app-route-page">
+      <Topbar
+        breadcrumbs={[
+          { label: 'Workspaces', href: '/app/workspaces' },
+          ...(requestedProject
+            ? [
+              {
+                label: requestedWorkspace?.name ?? 'Workspace',
+                href: `/app/workspaces/${requestedProject.workspace_id}/projects`,
+              },
+              {
+                label: requestedProject.name,
+                href: `/app/projects/${requestedProject.id}`,
+              },
+            ]
+            : []),
+          { label: 'Services', href: requestedProjectId ? `/app/services?project_id=${requestedProjectId}` : '/app/services' },
+        ]}
+        showSearch={false}
+      />
+      <main className="app-page-content">
         <header className="app-page-heading">
-          <p className="app-page-heading__eyebrow">Infrastructure</p>
-          <h1>Services</h1>
-          <p>Keep credentials connected to the environments and services that use them.</p>
+          <p className="app-page-heading__eyebrow">
+            {requestedWorkspace?.name ?? 'Infrastructure'}
+          </p>
+          <h1>{requestedProject ? `Services for ${requestedProject.name}` : 'Services'}</h1>
+          <p>
+            {requestedProject
+              ? 'Create services only inside this project, then add vaults to each service.'
+              : 'Choose a project to view or create its services.'}
+          </p>
         </header>
-        <form
-          onSubmit={handleCreate}
-          aria-label="Create service"
-          className="app-create-form"
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
-        >
-          <label htmlFor="service-name" style={visuallyHiddenStyle}>Service name</label>
-          <input
-            id="service-name"
-            required
-            maxLength={100}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Service name"
-            style={inputStyle}
-          />
-          <label htmlFor="service-description" style={visuallyHiddenStyle}>Service description</label>
-          <input
-            id="service-description"
-            maxLength={500}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Description (optional)"
-            style={inputStyle}
-          />
-          <label htmlFor="service-environment" style={visuallyHiddenStyle}>Environment</label>
-          <select
-            id="service-environment"
-            value={environment}
-            onChange={(event) => setEnvironment(event.target.value as (typeof environments)[number])}
-            style={inputStyle}
-          >
-            {environments.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-          <label htmlFor="service-workspace" style={visuallyHiddenStyle}>Workspace</label>
-          <select
-            id="service-workspace"
-            required
-            value={workspaceId}
-            onChange={(event) => setWorkspaceId(event.target.value)}
-            disabled={editableWorkspaces.length === 0}
-            style={inputStyle}
-          >
-            {editableWorkspaces.length === 0 && <option value="">No editable workspace</option>}
-            {editableWorkspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+
+        {error && (
+          <div className="app-request-error" role="alert">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {requestedProject ? (
+          <>
+            {canCreate ? (
+              <form
+                onSubmit={handleCreate}
+                aria-label="Create service"
+                className="service-context-create"
+              >
+                <div className="service-context-create__context" aria-label="Selected hierarchy">
+                  <span>Workspace</span>
+                  <strong>{requestedWorkspace?.name ?? 'Unavailable'}</strong>
+                  <span aria-hidden="true">/</span>
+                  <span>Project</span>
+                  <strong>{requestedProject.name}</strong>
+                </div>
+                <div className="service-context-create__fields">
+                  <label htmlFor="service-name" style={visuallyHiddenStyle}>Service name</label>
+                  <input
+                    id="service-name"
+                    required
+                    maxLength={100}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Service name"
+                    style={inputStyle}
+                  />
+                  <label htmlFor="service-description" style={visuallyHiddenStyle}>Service description</label>
+                  <input
+                    id="service-description"
+                    maxLength={500}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Description (optional)"
+                    style={inputStyle}
+                  />
+                  <label htmlFor="service-environment" style={visuallyHiddenStyle}>Environment</label>
+                  <select
+                    id="service-environment"
+                    value={environment}
+                    onChange={(event) => setEnvironment(event.target.value as (typeof environments)[number])}
+                    style={inputStyle}
+                  >
+                    {environments.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={saving || loading || !name.trim()}
+                    className="app-primary-action"
+                  >
+                    {saving ? 'Creating…' : 'Create service'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="app-request-error" role="alert">
+                You do not have permission to create services in this project.
+              </div>
+            )}
+          </>
+        ) : null}
+
+        {loading ? (
+          <SkeletonLoader variant="table-row" rows={5} />
+        ) : visibleServices.length === 0 ? (
+          !requestedProject ? (
+            <section className="resource-empty-panel">
+              <EmptyState
+                title="Choose a project"
+                message="Services belong to projects. Open a project first, then create its services."
+                icon={<Server size={32} />}
+                action={<Link to="/app/workspaces" className="app-primary-action">Browse workspaces</Link>}
+              />
+            </section>
+          ) : (
+            <section className="resource-empty-panel">
+              <EmptyState
+                title={`No services in ${requestedProject.name}`}
+                message="Create the first service in this project using the form above."
+                icon={<Server size={32} />}
+              />
+            </section>
+          )
+        ) : (
+          <ul className="resource-card-grid" aria-label="Services">
+            {visibleServices.map((service) => (
+              <li key={service.id}>
+                <Link className="resource-card" to={`/app/services/${service.id}`}>
+                  <span className="resource-card__icon">
+                    <Server size={20} aria-hidden="true" />
+                  </span>
+                  <span className="resource-card__body">
+                    <strong>{service.name}</strong>
+                    <span>{service.environment}{service.description ? ` · ${service.description}` : ''}</span>
+                  </span>
+                  <ArrowRight size={18} aria-hidden="true" />
+                </Link>
+              </li>
             ))}
-          </select>
-          <label htmlFor="service-project" style={visuallyHiddenStyle}>Project (optional)</label>
-          <select
-            id="service-project"
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-            style={inputStyle}
-          >
-            <option value="">No project</option>
-            {workspaceProjects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-          </select>
-          <button type="submit" disabled={saving || loading || editableWorkspaces.length === 0} style={buttonStyle}>
-            {saving ? 'Creating…' : 'Create service'}
-          </button>
-        </form>
-        {error && <p role="alert" style={{ color: 'var(--color-danger)', marginBottom: 'var(--space-3)' }}>{error}</p>}
-        {loading
-          ? <SkeletonLoader variant="table-row" rows={5} />
-          : <DataTable columns={columns} rows={services} getRowKey={(r) => r.id} onRowClick={(r) => navigate(`/app/services/${r.id}`)} caption="Services" emptyState={<EmptyState title="No services" message="Create a service to link credentials to environments." />} />}
-      </div>
+          </ul>
+        )}
+      </main>
     </div>
   )
 }
@@ -215,15 +305,6 @@ const inputStyle = {
   borderRadius: 'var(--radius-md)',
   backgroundColor: 'var(--color-bg)',
   color: 'var(--color-text)',
-}
-
-const buttonStyle = {
-  border: 'var(--border-card)',
-  borderRadius: 'var(--radius-md)',
-  padding: 'var(--space-2) var(--space-3)',
-  backgroundColor: 'var(--color-bg-subtle)',
-  color: 'var(--color-text)',
-  cursor: 'pointer',
 }
 
 const visuallyHiddenStyle = {

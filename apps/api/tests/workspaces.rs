@@ -26,7 +26,9 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     let vault_id = Uuid::new_v4();
     let second_vault_id = Uuid::new_v4();
     let project_id = Uuid::new_v4();
+    let second_project_id = Uuid::new_v4();
     let service_id = Uuid::new_v4();
+    let second_service_id = Uuid::new_v4();
 
     for (user_id, email) in [
         (owner_id, "owner"),
@@ -69,22 +71,6 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .await
     .expect("insert workspace memberships");
 
-    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
-        .bind(vault_id)
-        .bind(owner_id)
-        .bind(workspace_id)
-        .execute(&mut *tx)
-        .await
-        .expect("insert workspace vault");
-
-    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
-        .bind(second_vault_id)
-        .bind(owner_id)
-        .bind(second_workspace_id)
-        .execute(&mut *tx)
-        .await
-        .expect("insert second workspace vault");
-
     sqlx::query(
         "INSERT INTO projects (id, owner_id, workspace_id, name) VALUES ($1, $2, $3, 'Project')",
     )
@@ -94,6 +80,16 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .execute(&mut *tx)
     .await
     .expect("insert workspace project");
+
+    sqlx::query(
+        "INSERT INTO projects (id, owner_id, workspace_id, name) VALUES ($1, $2, $3, 'Second project')",
+    )
+    .bind(second_project_id)
+    .bind(owner_id)
+    .bind(second_workspace_id)
+    .execute(&mut *tx)
+    .await
+    .expect("insert second workspace project");
 
     sqlx::query(
         "INSERT INTO services (id, owner_id, workspace_id, project_id, name, environment)
@@ -106,6 +102,33 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .execute(&mut *tx)
     .await
     .expect("insert workspace service");
+
+    sqlx::query(
+        "INSERT INTO services (id, owner_id, workspace_id, project_id, name, environment)
+         VALUES ($1, $2, $3, $4, 'Second service', 'staging')",
+    )
+    .bind(second_service_id)
+    .bind(owner_id)
+    .bind(second_workspace_id)
+    .bind(second_project_id)
+    .execute(&mut *tx)
+    .await
+    .expect("insert second workspace service");
+
+    for (vault_id, name) in [(vault_id, "Primary"), (second_vault_id, "Secondary")] {
+        sqlx::query(
+            "INSERT INTO vaults (id, owner_id, workspace_id, service_id, name)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(vault_id)
+        .bind(owner_id)
+        .bind(workspace_id)
+        .bind(service_id)
+        .bind(name)
+        .execute(&mut *tx)
+        .await
+        .expect("insert service vault");
+    }
 
     let role: String = sqlx::query_scalar(
         "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
@@ -127,7 +150,15 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
     .fetch_one(&mut *tx)
     .await
     .expect("count workspace resources");
-    assert_eq!(linked_resources, 3);
+    assert_eq!(linked_resources, 4);
+
+    let service_vault_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM vaults WHERE service_id = $1")
+            .bind(service_id)
+            .fetch_one(&mut *tx)
+            .await
+            .expect("count service vaults");
+    assert_eq!(service_vault_count, 2);
 
     let owner_workspace_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM workspace_members WHERE user_id = $1")

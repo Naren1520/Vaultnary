@@ -1,8 +1,7 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react'
-import { Download, Plus, Upload } from 'lucide-react'
+import { Download, GitBranch, Plus, Upload } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
 import Topbar from '../../components/ui/Topbar'
-import Inspector from '../../components/ui/Inspector'
-import EmptyState from '../../components/feedback/EmptyState'
 import { useVaultStore } from '../../state/vault-store'
 import { apiPost } from '../../services/http-client'
 import VaultUnlockScreen from './VaultUnlockScreen'
@@ -28,6 +27,7 @@ const actionStyle = {
 } as const
 
 export default function VaultPage() {
+  const { vaultId } = useParams<{ vaultId: string }>()
   const isUnlocked = useVaultStore((s) => s.isUnlocked)
   const privateKey = useVaultStore((s) => s.privateKey)
   const [, forceUpdate] = useState(0)
@@ -44,11 +44,17 @@ export default function VaultPage() {
   }
 
   async function handleExport() {
+    if (!vaultId) {
+      setArchiveError('Select a service vault before exporting.')
+      return
+    }
     setArchiveBusy(true)
     setArchiveError('')
     setArchiveNotice('')
     try {
-      const response = await apiPost<{ data: VaultArchive }>('/api/v1/vault/export')
+      const response = await apiPost<{ data: VaultArchive }>('/api/v1/vault/export', {
+        vault_id: vaultId,
+      })
       if (!response.data || response.data.version !== 2) {
         throw new Error('The server returned an invalid vault archive.')
       }
@@ -72,6 +78,10 @@ export default function VaultPage() {
   }
 
   async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    if (!vaultId) {
+      setArchiveError('Select a service vault before importing an archive.')
+      return
+    }
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     if (!file) return
@@ -89,7 +99,10 @@ export default function VaultPage() {
     setArchiveNotice('')
     try {
       const archive = await verifyVaultArchive(JSON.parse(await file.text()) as unknown, privateKey)
-      const response = await apiPost<{ data: { imported: number } }>('/api/v1/vault/import', archive)
+      const response = await apiPost<{ data: { imported: number } }>('/api/v1/vault/import', {
+        vault_id: vaultId,
+        archive,
+      })
       setListKey((key) => key + 1)
       setArchiveNotice(`${response.data.imported} credential${response.data.imported === 1 ? '' : 's'} imported.`)
     } catch (cause) {
@@ -116,13 +129,28 @@ export default function VaultPage() {
   if (!isUnlocked) {
     return <VaultUnlockScreen onUnlocked={handleUnlocked} />
   }
+  if (!vaultId) {
+    return (
+      <div role="alert" style={{ padding: 'var(--space-4)', color: 'var(--color-danger)' }}>
+        A service vault must be selected to open credential contents.
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Topbar
-        breadcrumbs={[{ label: 'Vault', href: '/app/vault' }]}
+        showSearch
+        breadcrumbs={[
+          { label: 'Vaults', href: '/app/vault' },
+          { label: 'Service vault', href: `/app/vaults/${vaultId}` },
+        ]}
         actionsSlot={
           <div className="vault-actions">
+            <Link to={`/app/hierarchy/${vaultId}`} className="app-secondary-action">
+              <GitBranch size={14} aria-hidden="true" />
+              Credential hierarchy
+            </Link>
             <button type="button" onClick={handleExport} disabled={archiveBusy} style={actionStyle}>
               <Download size={14} aria-hidden="true" />
               Export
@@ -187,16 +215,15 @@ export default function VaultPage() {
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }}>
           <header className="app-page-heading">
             <p className="app-page-heading__eyebrow">Private by design</p>
-            <h1>Your vault</h1>
-            <p>Your encrypted credentials, ready when you need them.</p>
+            <h1>Service vault</h1>
+            <p>Encrypted credentials for this service.</p>
           </header>
-          <VaultList key={listKey} onCreateCredential={() => setShowCreate(true)} />
+          <VaultList
+            key={`${vaultId}:${listKey}`}
+            vaultId={vaultId}
+            onCreateCredential={() => setShowCreate(true)}
+          />
         </div>
-        <Inspector>
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <EmptyState title="Nothing selected" message="Click a credential to view its details." />
-          </div>
-        </Inspector>
       </div>
 
       {/* Create credential modal */}
@@ -246,12 +273,13 @@ export default function VaultPage() {
             >
               ×
             </button>
-            <VaultItemForm onSuccess={handleCreated} />
+            <VaultItemForm vaultId={vaultId} onSuccess={handleCreated} />
           </div>
         </div>
       )}
       {showEnvImport && (
         <EnvImportDialog
+          vaultId={vaultId}
           onClose={handleEnvImportClose}
           onImported={handleEnvImported}
         />

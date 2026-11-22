@@ -179,7 +179,10 @@ export default function WorkspacesPage() {
             setMemberRole('editor');
         }
     }, [selectedWorkspace?.id, selectedWorkspace?.role, memberRole]);
-    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Workspaces', href: '/app/workspaces' }] }), _jsxs("main", { className: "app-page-content", style: {
+    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, children: [_jsx(Topbar, { breadcrumbs: [
+                    { label: 'Workspaces', href: '/app/workspaces' },
+                    { label: 'Manage workspaces', href: '/app/workspaces/manage' },
+                ], showSearch: false }), _jsxs("main", { className: "app-page-content", style: {
                     padding: 'var(--space-4)',
                     overflowY: 'auto',
                     flex: 1,

@@ -50,8 +50,13 @@ describe('ProfilePage', () => {
     });
     it('loads account details and email verification status', async () => {
         renderProfilePage();
-        expect(await screen.findByText('person@example.com')).toBeInTheDocument();
+        expect((await screen.findAllByText('person@example.com')).length).toBeGreaterThan(0);
         expect(screen.getByText('Verified')).toBeInTheDocument();
+        expect(screen.getByRole('navigation', { name: 'Profile sections' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Password and security' }))
+            .toHaveAttribute('href', '#profile-password-title');
+        expect(screen.getByRole('link', { name: 'Open Security Center' }))
+            .toHaveAttribute('href', '/app/security');
         expect(mocks.apiGet).toHaveBeenCalledWith('/api/v1/users/me', expect.objectContaining({
             signal: expect.any(AbortSignal),
         }));

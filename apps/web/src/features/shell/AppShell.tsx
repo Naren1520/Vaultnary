@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
-import Sidebar from '../../components/ui/Sidebar'
+import TopNavigation from '../../components/ui/TopNavigation'
 import ErrorBoundary from '../../components/feedback/ErrorBoundary'
 import { ToastProvider } from '../../components/ui/Toast'
 import Loader from '../../components/ui/Loader'
@@ -28,13 +28,14 @@ export default function AppShell() {
   const location = useLocation()
   const isUnlocked = useVaultStore((state) => state.isUnlocked)
   const requiresVaultUnlock =
-    location.pathname.startsWith('/app/vault') ||
-    location.pathname.startsWith('/app/hierarchy')
+    location.pathname.startsWith('/app/vaults/') ||
+    location.pathname.startsWith('/app/vault/') ||
+    /^\/app\/hierarchy\/[^/]+/.test(location.pathname)
 
   return (
     <ToastProvider>
       <div className="app-shell">
-        <Sidebar />
+        <TopNavigation />
         <main
           id="main-content"
           className="app-main"

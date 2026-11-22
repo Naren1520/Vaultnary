@@ -87,8 +87,9 @@ describe('HTTP client', () => {
     useAuthStore.setState({ csrfToken: 'active-csrf' })
 
     const { apiGet } = await importClient()
-    // Don't await -it never resolves after redirect
-    apiGet('/api/v1/protected').catch(() => {})
+    await expect(apiGet('/api/v1/protected')).rejects.toThrow(
+      'Your session has expired',
+    )
     await vi.waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'))
 
     expect(useAuthStore.getState().csrfToken).toBeNull()

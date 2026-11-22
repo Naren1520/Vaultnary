@@ -28,6 +28,7 @@ Vaultnary uses PostgreSQL 16 with sequential SQL migrations. All tables use UUID
 | 015_account_audit_purge.sql | Narrowly scoped audit-event purge function for account deletion |
 | 016_vault_key_material.sql | Encrypted vault private-key material and encrypted credential metadata |
 | 017_account_request_metrics.sql | Per-account minute-bucket request activity |
+| 018_service_vaults.sql | Projects required for services and service-owned vaults |
 
 ---
 
@@ -90,21 +91,25 @@ Key points:
 
 ### vaults
 
-One vault per user. Created automatically on registration.
+Vaults belong to a service inside a project. A service can contain multiple vaults.
 
 ```sql
 CREATE TABLE vaults (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name        TEXT        NOT NULL DEFAULT 'Default Vault',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    service_id   UUID        NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    name         TEXT        NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE UNIQUE INDEX idx_vaults_owner_id ON vaults (owner_id);
+CREATE INDEX idx_vaults_workspace_id ON vaults (workspace_id);
+CREATE INDEX idx_vaults_service_id ON vaults (service_id);
 ```
 
 Key points:
-- UNIQUE constraint on `owner_id` - exactly one vault per user
-- Created in the same transaction as user registration
+- A workspace contains projects; each project contains services; each service can contain multiple vaults
+- Vault creation is explicit and happens from the owning service
+- Migration 018 moves existing workspace vaults into a generated "General" project and "Workspace credentials" service so existing credentials remain available
 
 ### vault_items
 
@@ -146,12 +151,13 @@ Key points:
 
 ### projects
 
-Software projects that consume credentials.
+Software projects inside a workspace. Each project can contain multiple services.
 
 ```sql
 CREATE TABLE projects (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id UUID       NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     name        TEXT        NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
     description TEXT        CHECK (char_length(description) <= 500),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -162,13 +168,14 @@ CREATE INDEX idx_projects_owner_id ON projects (owner_id);
 
 ### services
 
-Runtime services within a project (dev/staging/production/custom).
+Runtime services within a project (dev/staging/production/custom). Each service owns its vaults.
 
 ```sql
 CREATE TABLE services (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id  UUID        REFERENCES projects(id) ON DELETE CASCADE,
+    project_id  UUID        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     owner_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id UUID       NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     name        TEXT        NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
     description TEXT        CHECK (char_length(description) <= 500),
     environment TEXT        NOT NULL CHECK (environment IN ('development','staging','production','custom')),

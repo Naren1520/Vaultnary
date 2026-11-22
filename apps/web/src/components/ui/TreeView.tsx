@@ -5,6 +5,7 @@ import SkeletonLoader from './SkeletonLoader'
 export interface TreeNode {
   id: string
   label: string
+  description?: string
   /** If true, the node has children but they haven't been loaded yet */
   hasChildren?: boolean
   children?: TreeNode[]
@@ -34,7 +35,7 @@ export default function TreeView({
   return (
     <ul
       role={depth === 0 ? 'tree' : 'group'}
-      style={{ listStyle: 'none', paddingLeft: depth === 0 ? 0 : 'var(--space-4)' }}
+      className={`credential-tree${depth > 0 ? ' credential-tree--nested' : ''}`}
     >
       {nodes.map((node) => (
         <TreeItem
@@ -93,65 +94,45 @@ function TreeItem({
   return (
     <li
       role="treeitem"
+      className="credential-tree__item"
       aria-expanded={hasChildren ? expanded : undefined}
       aria-selected={isSelected}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-1)',
-          padding: 'var(--space-1) var(--space-2)',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-          backgroundColor: isSelected ? 'rgba(37,99,235,0.08)' : 'transparent',
-          color: isSelected ? 'var(--color-accent)' : 'var(--color-text)',
-          fontSize: 'var(--text-sm)',
-        }}
-        onClick={handleSelect}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            handleSelect()
-          }
-          if (e.key === 'ArrowRight') handleToggle(e)
-          if (e.key === 'ArrowLeft' && expanded) handleToggle(e)
-        }}
-        tabIndex={0}
-      >
-        {/* Expand/collapse toggle */}
-        <span
+      <div className={`credential-tree__row${isSelected ? ' credential-tree__row--selected' : ''}`}>
+        <button
+          type="button"
+          className="credential-tree__toggle"
           onClick={handleToggle}
-          aria-label={expanded ? 'Collapse' : 'Expand'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            color: 'var(--color-text-muted)',
-            visibility: hasChildren ? 'visible' : 'hidden',
-            flexShrink: 0,
-          }}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.label}`}
+          aria-expanded={hasChildren ? expanded : undefined}
+          disabled={!hasChildren}
         >
           {expanded ? (
-            <ChevronDown size={14} aria-hidden="true" />
+            <ChevronDown size={15} aria-hidden="true" />
           ) : (
-            <ChevronRight size={14} aria-hidden="true" />
+            <ChevronRight size={15} aria-hidden="true" />
           )}
-        </span>
-
-        {node.icon && (
-          <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-            {node.icon}
+        </button>
+        <button
+          type="button"
+          className="credential-tree__select"
+          onClick={handleSelect}
+          aria-current={isSelected ? 'true' : undefined}
+        >
+          {node.icon && (
+            <span className="credential-tree__icon">{node.icon}</span>
+          )}
+          <span className="credential-tree__copy">
+            <strong>{node.label}</strong>
+            {node.description && <span title={node.description}>{node.description}</span>}
           </span>
-        )}
-
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {node.label}
-        </span>
+          <span className="credential-tree__open">View</span>
+        </button>
       </div>
 
       {/* Children */}
       {expanded && (
-        <div>
+        <div className="credential-tree__children">
           {loading ? (
             <div style={{ paddingLeft: 'var(--space-4)' }}>
               <SkeletonLoader variant="tree-node" />

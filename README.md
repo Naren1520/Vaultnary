@@ -35,7 +35,7 @@ Zero-knowledge credential manager for individuals and teams. Every secret is enc
 
 - Store passwords, API keys, SSH keys, database credentials, TOTP seeds, and more in one place
 - Share individual credentials with teammates at specific roles (Viewer, Editor, Co-owner)
-- Organise credentials into a tree hierarchy and link them to projects and environments
+- Organise credentials as workspaces → projects → services → vaults, with optional credential hierarchies inside each vault
 - View a permanent, tamper-proof audit log of every access and change
 - Recover your vault if you forget your master password via a recovery passphrase
 

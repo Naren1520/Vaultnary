@@ -18,7 +18,7 @@ export default function Topbar({
   breadcrumbs = [],
   searchSlot,
   actionsSlot,
-  showSearch = true,
+  showSearch = false,
 }: TopbarProps) {
   const [query, setQuery] = useState('')
 

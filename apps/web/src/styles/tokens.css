@@ -49,9 +49,6 @@
   --outline-focus: 2px solid var(--color-accent);
   --outline-offset-focus: 2px;
 
-  /* Sidebar */
-  --sidebar-width: 14rem;
-
   /* Inspector / detail panel */
   --inspector-width: 22rem;
 

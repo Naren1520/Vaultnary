@@ -57,8 +57,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     useAuthStore.getState().clearCsrfToken()
     useVaultStore.getState().lockVault()
     window.location.replace('/login')
-    // Return a promise that never resolves (we're redirecting)
-    return new Promise(() => {})
+    throw new Error('Your session has expired. Sign in again.')
   }
 
   // 422 -validation errors

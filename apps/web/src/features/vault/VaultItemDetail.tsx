@@ -4,7 +4,7 @@ import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import CredentialBadge, { CredentialType } from '../../components/ui/CredentialBadge'
 import { apiGet } from '../../services/http-client'
 import { useVaultStore } from '../../state/vault-store'
-import { decryptVaultMetadata, type EncryptedVaultItem, type VaultItem } from './metadata'
+import { decryptVaultMetadata, formatVaultDate, type EncryptedVaultItem, type VaultItem } from './metadata'
 import SecretField from './SecretField'
 
 interface VaultItemMeta extends EncryptedVaultItem {
@@ -68,6 +68,15 @@ export default function VaultItemDetail() {
     )
   }
 
+  const lastAccessed = formatVaultDate(item.last_accessed_at, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+  const created = formatVaultDate(item.created_at, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+
   return (
     <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       {/* Header */}
@@ -122,9 +131,9 @@ export default function VaultItemDetail() {
 
       {/* Notes */}
       {item.notes && (
-        <div>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-1)' }}>Notes</p>
-          <p style={{ fontSize: 'var(--text-sm)', whiteSpace: 'pre-wrap' }}>{item.notes}</p>
+        <div className="credential-account-note">
+          <p>Account / usage note</p>
+          <span>{item.notes}</span>
         </div>
       )}
 
@@ -132,11 +141,11 @@ export default function VaultItemDetail() {
       <div style={{ borderTop: 'var(--border-card)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {item.last_accessed_at && (
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Last accessed: {new Date(item.last_accessed_at).toLocaleString()}
+            Last accessed: {lastAccessed ?? 'Date unavailable'}
           </p>
         )}
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-          Created: {new Date(item.created_at).toLocaleString()}
+          Created: {created ?? 'Date unavailable'}
         </p>
       </div>
     </div>

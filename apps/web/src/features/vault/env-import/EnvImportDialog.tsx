@@ -9,6 +9,7 @@ import { MAX_ENV_FILE_BYTES, parseEnv } from './parseEnv'
 import { detectCsvFormat, parseCsv } from './parseCsv'
 
 interface EnvImportDialogProps {
+  vaultId: string
   onClose: () => void
   onImported: (count: number) => void
 }
@@ -31,7 +32,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-export default function EnvImportDialog({ onClose, onImported }: EnvImportDialogProps) {
+export default function EnvImportDialog({ vaultId, onClose, onImported }: EnvImportDialogProps) {
   const privateKey = useVaultStore((state) => state.privateKey)
   const [source, setSource] = useState('')
   const [format, setFormat] = useState<'auto' | 'env' | 'csv'>('auto')
@@ -205,6 +206,7 @@ export default function EnvImportDialog({ onClose, onImported }: EnvImportDialog
       failedKey = null
       setProgress('Saving all encrypted variables together…')
       const response = await apiPost<CreateResponse>('/api/v1/vault/import-env', {
+        vault_id: vaultId,
         items: encryptedItems,
       })
       if (response.data.imported !== encryptedItems.length) {

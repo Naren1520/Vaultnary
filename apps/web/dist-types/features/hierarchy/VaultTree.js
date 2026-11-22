@@ -1,4 +1,4 @@
-import { jsx as _jsx } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TreeView from '../../components/ui/TreeView';
@@ -18,44 +18,51 @@ async function mapToTreeNode(item, privateKey) {
             : undefined,
     };
 }
-export default function VaultTree() {
+export default function VaultTree({ vaultId }) {
     const navigate = useNavigate();
     const privateKey = useVaultStore((state) => state.privateKey);
     const [nodes, setNodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [retryCount, setRetryCount] = useState(0);
     useEffect(() => {
         const ctrl = new AbortController();
-        apiGet('/api/v1/vault/tree?depth=2', { signal: ctrl.signal })
+        setLoading(true);
+        apiGet(`/api/v1/vault/tree?vault_id=${encodeURIComponent(vaultId)}&depth=2`, { signal: ctrl.signal })
             .then(async (res) => {
             if (!privateKey)
                 throw new Error('Unlock the vault to view its hierarchy.');
             const nodes = await Promise.all(res.data.map((item) => mapToTreeNode(item, privateKey)));
-            if (!ctrl.signal.aborted)
+            if (!ctrl.signal.aborted) {
                 setNodes(nodes);
+                setError('');
+            }
         })
             .catch((cause) => {
             if (!ctrl.signal.aborted) {
                 setError(cause instanceof Error ? cause.message : 'Could not load the vault hierarchy.');
             }
         })
-            .finally(() => setLoading(false));
+            .finally(() => {
+            if (!ctrl.signal.aborted)
+                setLoading(false);
+        });
         return () => ctrl.abort();
-    }, [privateKey]);
+    }, [privateKey, retryCount, vaultId]);
     async function handleExpand(node) {
         if (!privateKey)
             throw new Error('Unlock the vault to view its hierarchy.');
-        const res = await apiGet(`/api/v1/vault/items/${node.id}/children`);
+        const res = await apiGet(`/api/v1/vault/items/${node.id}/children?vault_id=${encodeURIComponent(vaultId)}`);
         return Promise.all(res.data.map((item) => mapToTreeNode(item, privateKey)));
     }
     if (error) {
-        return _jsx("p", { role: "alert", style: { color: 'var(--color-danger)' }, children: error });
+        return (_jsxs("div", { role: "alert", style: { color: 'var(--color-danger)' }, children: [_jsx("p", { children: error }), _jsx("button", { type: "button", onClick: () => setRetryCount((count) => count + 1), children: "Retry" })] }));
     }
     if (loading) {
         return (_jsx("div", { children: Array.from({ length: 5 }).map((_, i) => (_jsx(SkeletonLoader, { variant: "tree-node" }, i))) }));
     }
     if (nodes.length === 0) {
-        return (_jsx(EmptyState, { title: "Your hierarchy is ready", message: "Once you add credentials, their folders and relationships will appear here.", action: _jsx(Link, { to: "/app/vault", style: {
+        return (_jsx(EmptyState, { title: "Your hierarchy is ready", message: "Once you add credentials, their folders and relationships will appear here.", action: _jsx(Link, { to: `/app/vaults/${vaultId}`, style: {
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '0.65rem 0.9rem',
@@ -66,5 +73,5 @@ export default function VaultTree() {
                     fontWeight: 'var(--font-weight-semibold)',
                 }, children: "Go to your vault" }) }));
     }
-    return (_jsx(TreeView, { nodes: nodes, onNodeSelect: (node) => navigate(`/app/vault/${node.id}`), onNodeExpand: handleExpand }));
+    return (_jsx(TreeView, { nodes: nodes, onNodeSelect: (node) => navigate(`/app/vaults/${vaultId}/items/${node.id}`), onNodeExpand: handleExpand }));
 }

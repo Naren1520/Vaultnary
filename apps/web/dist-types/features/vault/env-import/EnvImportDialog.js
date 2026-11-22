@@ -16,7 +16,7 @@ function bytesToBase64(bytes) {
     }
     return btoa(binary);
 }
-export default function EnvImportDialog({ onClose, onImported }) {
+export default function EnvImportDialog({ vaultId, onClose, onImported }) {
     const privateKey = useVaultStore((state) => state.privateKey);
     const [source, setSource] = useState('');
     const [format, setFormat] = useState('auto');
@@ -164,6 +164,7 @@ export default function EnvImportDialog({ onClose, onImported }) {
             failedKey = null;
             setProgress('Saving all encrypted variables together…');
             const response = await apiPost('/api/v1/vault/import-env', {
+                vault_id: vaultId,
                 items: encryptedItems,
             });
             if (response.data.imported !== encryptedItems.length) {

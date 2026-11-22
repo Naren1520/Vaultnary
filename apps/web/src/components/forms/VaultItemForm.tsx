@@ -67,6 +67,8 @@ const TYPE_LABELS: Record<CredentialType, string> = {
 /* Component props                                                     */
 
 interface VaultItemFormProps {
+  /** Service vault receiving a newly created credential */
+  vaultId: string
   /** When provided the form is in edit mode */
   itemId?: string
   onSuccess: (id: string) => void
@@ -108,7 +110,7 @@ function uint8ToBase64(arr: Uint8Array): string {
 
 /* VaultItemForm                                                        */
 
-export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps) {
+export default function VaultItemForm({ vaultId, itemId, onSuccess }: VaultItemFormProps) {
   const isEditMode = Boolean(itemId)
 
   /* Core form state */
@@ -209,6 +211,7 @@ export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps)
       const body = {
         encrypted_metadata: uint8ToBase64(sealed.encryptedMetadata),
         encrypted_payload: uint8ToBase64(sealed.encryptedPayload),
+        ...(!isEditMode ? { vault_id: vaultId } : {}),
         ...(sealed.encryptedDek
           ? { encrypted_dek: uint8ToBase64(sealed.encryptedDek) }
           : {}),
@@ -396,14 +399,26 @@ export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps)
           />
         </Field>
 
-        {/* Notes */}
-        <Field label="Notes" error={fieldErrors['notes']}>
+        {/* Private account and usage context */}
+        <Field
+          label="Account / usage note"
+          hint="Private and encrypted"
+          error={fieldErrors['notes']}
+          htmlFor="credential-account-note"
+        >
           <textarea
+            id="credential-account-note"
             value={notes}
             onChange={(e) => { setNotes(e.target.value); clearError('notes') }}
             rows={3}
+            maxLength={10_000}
+            placeholder="For example: Created using eg1@gmail.com for the production Redis instance."
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
           />
+          <span className="credential-note-hint">
+            Add the account or purpose that will help you recognize this credential later. Don’t
+            put another secret here.
+          </span>
         </Field>
 
         {globalError && (
@@ -470,16 +485,18 @@ export default function VaultItemForm({ itemId, onSuccess }: VaultItemFormProps)
 
 interface FieldProps {
   label: string
+  htmlFor?: string
   hint?: string
   error?: string
   required?: boolean
   children: React.ReactNode
 }
 
-function Field({ label, hint, error, required, children }: FieldProps) {
+function Field({ label, htmlFor, hint, error, required, children }: FieldProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
       <label
+        htmlFor={htmlFor}
         style={{
           fontSize: 'var(--text-sm)',
           fontWeight: 'var(--font-weight-medium)',

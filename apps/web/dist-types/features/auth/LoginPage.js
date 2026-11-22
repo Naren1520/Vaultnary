@@ -43,7 +43,7 @@ export default function LoginPage() {
                 password,
             });
             setCsrfToken(res.csrf_token);
-            navigate('/app/vault', { replace: true });
+            navigate('/app/workspaces', { replace: true });
         }
         catch (err) {
             if (err instanceof ValidationError) {

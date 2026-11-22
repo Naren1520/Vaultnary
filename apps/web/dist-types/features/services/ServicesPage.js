@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Topbar from '../../components/ui/Topbar';
 import DataTable from '../../components/ui/DataTable';
 import SkeletonLoader from '../../components/ui/SkeletonLoader';
@@ -15,6 +15,8 @@ const columns = [
 ];
 export default function ServicesPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const requestedProjectId = searchParams.get('project_id');
     const { showToast } = useToast();
     const [services, setServices] = useState([]);
     const [workspaces, setWorkspaces] = useState([]);
@@ -40,9 +42,20 @@ export default function ServicesPage() {
             setServices(serviceResponse.data);
             setWorkspaces(workspaceResponse.data);
             setProjects(projectResponse.data);
+            const requestedProject = projectResponse.data.find((project) => project.id === requestedProjectId);
+            const editableRequestedProject = requestedProject && workspaceResponse.data.some((workspace) => workspace.id === requestedProject.workspace_id && workspace.role !== 'viewer')
+                ? requestedProject
+                : undefined;
             setWorkspaceId((current) => current && workspaceResponse.data.some(({ id }) => id === current)
                 ? current
-                : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '');
+                : editableRequestedProject
+                    ? editableRequestedProject.workspace_id
+                    : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '');
+            setProjectId((current) => current && projectResponse.data.some(({ id }) => id === current)
+                ? current
+                : editableRequestedProject
+                    ? editableRequestedProject.id
+                    : '');
         })
             .catch((cause) => {
             if (!ctrl.signal.aborted) {
@@ -54,17 +67,21 @@ export default function ServicesPage() {
                 setLoading(false);
         });
         return () => ctrl.abort();
-    }, []);
+    }, [requestedProjectId]);
     useEffect(() => {
-        if (projectId && !workspaceProjects.some((project) => project.id === projectId)) {
-            setProjectId('');
+        if (!workspaceProjects.some((project) => project.id === projectId)) {
+            setProjectId(workspaceProjects[0]?.id ?? '');
         }
     }, [projectId, workspaceProjects]);
     async function handleCreate(event) {
         event.preventDefault();
         const trimmedName = name.trim();
-        if (!trimmedName || !workspaceId) {
-            setError(!trimmedName ? 'Enter a service name.' : 'Choose a workspace where you can edit.');
+        if (!trimmedName || !workspaceId || !projectId) {
+            setError(!trimmedName
+                ? 'Enter a service name.'
+                : !workspaceId
+                    ? 'Choose a workspace where you can edit.'
+                    : 'Choose a project for this service.');
             return;
         }
         setSaving(true);
@@ -75,7 +92,7 @@ export default function ServicesPage() {
                 description: description.trim() || null,
                 environment,
                 workspace_id: workspaceId,
-                project_id: projectId || null,
+                project_id: projectId,
             });
             setServices((current) => [response.data, ...current]);
             setName('');
@@ -90,7 +107,7 @@ export default function ServicesPage() {
             setSaving(false);
         }
     }
-    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Services', href: '/app/services' }] }), _jsxs("div", { className: "app-page-content", style: { padding: 'var(--space-4)', flex: 1 }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Infrastructure" }), _jsx("h1", { children: "Services" }), _jsx("p", { children: "Keep credentials connected to the environments and services that use them." })] }), _jsxs("form", { onSubmit: handleCreate, "aria-label": "Create service", className: "app-create-form", style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }, children: [_jsx("label", { htmlFor: "service-name", style: visuallyHiddenStyle, children: "Service name" }), _jsx("input", { id: "service-name", required: true, maxLength: 100, value: name, onChange: (event) => setName(event.target.value), placeholder: "Service name", style: inputStyle }), _jsx("label", { htmlFor: "service-description", style: visuallyHiddenStyle, children: "Service description" }), _jsx("input", { id: "service-description", maxLength: 500, value: description, onChange: (event) => setDescription(event.target.value), placeholder: "Description (optional)", style: inputStyle }), _jsx("label", { htmlFor: "service-environment", style: visuallyHiddenStyle, children: "Environment" }), _jsx("select", { id: "service-environment", value: environment, onChange: (event) => setEnvironment(event.target.value), style: inputStyle, children: environments.map((value) => _jsx("option", { value: value, children: value }, value)) }), _jsx("label", { htmlFor: "service-workspace", style: visuallyHiddenStyle, children: "Workspace" }), _jsxs("select", { id: "service-workspace", required: true, value: workspaceId, onChange: (event) => setWorkspaceId(event.target.value), disabled: editableWorkspaces.length === 0, style: inputStyle, children: [editableWorkspaces.length === 0 && _jsx("option", { value: "", children: "No editable workspace" }), editableWorkspaces.map((workspace) => (_jsx("option", { value: workspace.id, children: workspace.name }, workspace.id)))] }), _jsx("label", { htmlFor: "service-project", style: visuallyHiddenStyle, children: "Project (optional)" }), _jsxs("select", { id: "service-project", value: projectId, onChange: (event) => setProjectId(event.target.value), style: inputStyle, children: [_jsx("option", { value: "", children: "No project" }), workspaceProjects.map((project) => (_jsx("option", { value: project.id, children: project.name }, project.id)))] }), _jsx("button", { type: "submit", disabled: saving || loading || editableWorkspaces.length === 0, style: buttonStyle, children: saving ? 'Creating…' : 'Create service' })] }), error && _jsx("p", { role: "alert", style: { color: 'var(--color-danger)', marginBottom: 'var(--space-3)' }, children: error }), loading
+    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Services', href: '/app/services' }] }), _jsxs("div", { className: "app-page-content", style: { padding: 'var(--space-4)', flex: 1 }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Infrastructure" }), _jsx("h1", { children: "Services" }), _jsx("p", { children: "Keep credentials connected to the environments and services that use them." })] }), _jsxs("form", { onSubmit: handleCreate, "aria-label": "Create service", className: "app-create-form", style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }, children: [_jsx("label", { htmlFor: "service-name", style: visuallyHiddenStyle, children: "Service name" }), _jsx("input", { id: "service-name", required: true, maxLength: 100, value: name, onChange: (event) => setName(event.target.value), placeholder: "Service name", style: inputStyle }), _jsx("label", { htmlFor: "service-description", style: visuallyHiddenStyle, children: "Service description" }), _jsx("input", { id: "service-description", maxLength: 500, value: description, onChange: (event) => setDescription(event.target.value), placeholder: "Description (optional)", style: inputStyle }), _jsx("label", { htmlFor: "service-environment", style: visuallyHiddenStyle, children: "Environment" }), _jsx("select", { id: "service-environment", value: environment, onChange: (event) => setEnvironment(event.target.value), style: inputStyle, children: environments.map((value) => _jsx("option", { value: value, children: value }, value)) }), _jsx("label", { htmlFor: "service-workspace", style: visuallyHiddenStyle, children: "Workspace" }), _jsxs("select", { id: "service-workspace", required: true, value: workspaceId, onChange: (event) => setWorkspaceId(event.target.value), disabled: editableWorkspaces.length === 0, style: inputStyle, children: [editableWorkspaces.length === 0 && _jsx("option", { value: "", children: "No editable workspace" }), editableWorkspaces.map((workspace) => (_jsx("option", { value: workspace.id, children: workspace.name }, workspace.id)))] }), _jsx("label", { htmlFor: "service-project", style: visuallyHiddenStyle, children: "Project" }), _jsxs("select", { id: "service-project", required: true, value: projectId, onChange: (event) => setProjectId(event.target.value), disabled: workspaceProjects.length === 0, style: inputStyle, children: [workspaceProjects.length === 0 && _jsx("option", { value: "", children: "Create a project first" }), workspaceProjects.map((project) => (_jsx("option", { value: project.id, children: project.name }, project.id)))] }), _jsx("button", { type: "submit", disabled: saving || loading || editableWorkspaces.length === 0 || !projectId, style: buttonStyle, children: saving ? 'Creating…' : 'Create service' })] }), workspaceProjects.length === 0 && !loading && (_jsxs("p", { style: { marginBottom: 'var(--space-3)' }, children: ["Create a project in this workspace before adding a service. ", _jsx(Link, { to: "/app/projects", children: "Manage projects" })] })), error && _jsx("p", { role: "alert", style: { color: 'var(--color-danger)', marginBottom: 'var(--space-3)' }, children: error }), loading
                         ? _jsx(SkeletonLoader, { variant: "table-row", rows: 5 })
                         : _jsx(DataTable, { columns: columns, rows: services, getRowKey: (r) => r.id, onRowClick: (r) => navigate(`/app/services/${r.id}`), caption: "Services", emptyState: _jsx(EmptyState, { title: "No services", message: "Create a service to link credentials to environments." }) })] })] }));
 }

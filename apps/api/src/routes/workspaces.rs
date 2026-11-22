@@ -270,7 +270,6 @@ pub async fn create_workspace(
 ) -> Result<impl IntoResponse, ApiError> {
     let name = validate_workspace_name(&body)?;
     let workspace_id = Uuid::new_v4();
-    let vault_id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
     let mut tx = state
         .db()
@@ -300,14 +299,6 @@ pub async fn create_workspace(
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
-    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
-        .bind(vault_id)
-        .bind(auth.user_id)
-        .bind(workspace_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     tx.commit()
         .await

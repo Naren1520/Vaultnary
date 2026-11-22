@@ -17,6 +17,7 @@ const SupportPage = lazy(() => import('../features/company/SupportPage'))
 const AboutPage = lazy(() => import('../features/company/AboutPage'))
 const AppShell = lazy(() => import('../features/shell/AppShell'))
 const VaultPage = lazy(() => import('../features/vault/VaultPage'))
+const VaultsPage = lazy(() => import('../features/vault/VaultsPage'))
 const VaultItemDetail = lazy(() => import('../features/vault/VaultItemDetail'))
 const HierarchyPage = lazy(() => import('../features/hierarchy/HierarchyPage'))
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage'))
@@ -25,6 +26,7 @@ const ServicesPage = lazy(() => import('../features/services/ServicesPage'))
 const ServiceDetail = lazy(() => import('../features/services/ServiceDetail'))
 const SecurityCenterPage = lazy(() => import('../features/security-center/SecurityCenterPage'))
 const WorkspacesPage = lazy(() => import('../features/workspaces/WorkspacesPage'))
+const WorkspaceHomePage = lazy(() => import('../features/workspaces/WorkspaceHomePage'))
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage'))
 
 function ProtectedRoute() {
@@ -84,20 +86,25 @@ export const router = createBrowserRouter([
       {
         element: wrap(AppShell),
         children: [
-          { index: true, element: <Navigate to="vault" replace /> },
+          { index: true, element: <Navigate to="workspaces" replace /> },
 
           // Vault
-          { path: 'vault', element: wrap(VaultPage) },
+          { path: 'vault', element: wrap(VaultsPage) },
+          { path: 'vaults/:vaultId/items/:itemId', element: wrap(VaultItemDetail) },
+          { path: 'vaults/:vaultId', element: wrap(VaultPage) },
           { path: 'vault/:itemId', element: wrap(VaultItemDetail) },
 
           // Hierarchy
           { path: 'hierarchy', element: wrap(HierarchyPage) },
+          { path: 'hierarchy/:vaultId', element: wrap(HierarchyPage) },
 
           { path: 'projects', element: wrap(ProjectsPage) },
           { path: 'projects/:projectId', element: wrap(ProjectDetail) },
           { path: 'services', element: wrap(ServicesPage) },
           { path: 'services/:serviceId', element: wrap(ServiceDetail) },
-          { path: 'workspaces', element: wrap(WorkspacesPage) },
+          { path: 'workspaces', element: wrap(WorkspaceHomePage) },
+          { path: 'workspaces/manage', element: wrap(WorkspacesPage) },
+          { path: 'workspaces/:workspaceId/projects', element: wrap(ProjectsPage) },
           { path: 'security', element: wrap(SecurityCenterPage) },
           { path: 'audit', element: <Navigate to="/app/security?tab=audit" replace /> },
           { path: 'profile', element: wrap(ProfilePage) },

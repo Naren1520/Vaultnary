@@ -1,6 +1,26 @@
 import { openMetadata } from '../../crypto/envelope'
 import type { CredentialType } from '../../components/ui/CredentialBadge'
 
+export function formatVaultDate(
+  value: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
+): string | null {
+  if (!value?.trim()) return null
+
+  let date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    const legacyTimestamp = value.match(
+      /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?) ([+-]\d{2}:\d{2})(?::00)?$/,
+    )
+    if (!legacyTimestamp) return null
+
+    date = new Date(`${legacyTimestamp[1]}T${legacyTimestamp[2]}${legacyTimestamp[3]}`)
+  }
+
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat(undefined, options).format(date)
+}
+
 const CREDENTIAL_TYPES = new Set<CredentialType>([
   'email',
   'website',

@@ -1,56 +1,9 @@
 .app-shell {
   display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-}
-
-.app-sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  width: var(--sidebar-width);
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
-  flex: 0 0 var(--sidebar-width);
-  align-self: flex-start;
-  flex-direction: column;
-  padding: var(--space-4) 0;
-  overflow-y: auto;
-  border-right: var(--border-card);
-  background-color: var(--color-bg-subtle);
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--space-6);
-  padding-inline: var(--space-4);
-}
-
-.sidebar-links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-inline: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  text-decoration: none;
-}
-
-.sidebar-mobile-nav {
-  display: contents;
-}
-
-.sidebar-scroll-button {
-  display: none;
 }
 
 .app-main {
@@ -140,119 +93,39 @@
   max-width: 100%;
 }
 
-@media (max-width: 1100px) {
-  :root {
-    --sidebar-width: 12rem;
-    --inspector-width: 18rem;
-  }
-}
-
 @media (max-width: 760px) {
-  :root {
-    --mobile-nav-height: calc(4.5rem + env(safe-area-inset-bottom));
-  }
-
   .app-shell {
     display: block;
     min-height: 100vh;
     min-height: 100dvh;
   }
 
-  .app-sidebar {
-    position: fixed;
-    z-index: 100;
-    inset: auto 0 0;
-    width: 100%;
-    height: auto;
-    min-height: var(--mobile-nav-height);
-    flex-direction: column;
-    padding: 0.3rem 0 calc(0.3rem + env(safe-area-inset-bottom));
-    border: 0;
-    border-top: var(--border-card);
-  }
-
-  .sidebar-brand {
-    display: none;
-  }
-
-  .sidebar-section-label {
-    display: none;
-  }
-
-  .app-sidebar nav {
-    min-width: 0;
-    width: 100%;
-    min-height: 3.25rem;
-  }
-
-  .sidebar-mobile-nav {
-    display: flex;
-    width: 100%;
-    min-height: 3.25rem;
-    align-items: stretch;
-    gap: 0.25rem;
-  }
-
-  .sidebar-scroll-button {
-    display: grid;
-    width: 2rem;
-    height: 2rem;
-    flex: 0 0 2rem;
-    place-items: center;
-    border: 1px solid #e6eaf0;
-    border-radius: 0.65rem;
-    background: white;
-    color: #334155;
-  }
-
-  .sidebar-scroll-button:disabled {
-    opacity: 0.35;
-  }
-
-  .sidebar-links {
-    min-width: 0;
-    min-height: 3.25rem;
-    flex: 1;
-    flex-direction: row;
-    align-items: stretch;
-    gap: 0.3rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    scroll-behavior: smooth;
-  }
-
-  .sidebar-links::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sidebar-links li {
-    min-width: 4.5rem;
-    flex: 0 0 4.5rem;
-    display: flex;
-  }
-
-  .sidebar-link {
-    min-width: 4.5rem;
-    min-height: 3.25rem;
-    height: auto;
-    flex: 1;
-    flex-direction: column;
+  .app-primary-nav {
+    position: relative;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 0.1rem;
-    margin: 0;
-    padding: 0.2rem 0.15rem;
-    font-size: 0.64rem !important;
-    line-height: 1.15;
-    white-space: nowrap;
-    text-align: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .app-primary-nav__brand {
+    justify-content: center;
+  }
+
+  .app-primary-nav__pills {
+    width: min(100%, 28rem);
+    justify-content: space-between;
+  }
+
+  .app-primary-nav__pill {
+    flex: 1;
+    padding-inline: 0.55rem;
+    font-size: 0.78rem;
   }
 
   .app-main {
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding-bottom: var(--mobile-nav-height);
+    min-height: 0;
+    padding-bottom: 0;
   }
 
   .app-topbar {
@@ -303,6 +176,106 @@
     width: 100%;
   }
 
+  .project-services-heading-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-services-heading-row .app-primary-action {
+    width: 100%;
+  }
+
+  .service-vault-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .service-detail-page {
+    gap: 1.25rem;
+  }
+
+  .service-overview {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .service-overview__environment {
+    grid-column: 2;
+    justify-items: start;
+    padding: 0;
+    border: 0;
+  }
+
+  .service-vault-section__heading {
+    align-items: flex-start;
+  }
+
+  .service-vault-empty-state {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1rem;
+  }
+
+  .service-create-vault-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .service-create-vault-form label,
+  .service-create-vault-form__intro {
+    grid-column: auto;
+  }
+
+  .service-create-vault-form .app-primary-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .resource-create-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .service-context-create__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hierarchy-page {
+    gap: 1rem;
+  }
+
+  .hierarchy-selected-vault__heading,
+  .hierarchy-tree-panel__summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hierarchy-selected-vault__heading > div {
+    align-items: flex-start;
+  }
+
+  .hierarchy-selected-vault__heading .app-secondary-action,
+  .hierarchy-tree-panel__summary .app-secondary-action {
+    width: 100%;
+  }
+
+  .credential-tree {
+    padding: 0.65rem;
+  }
+
+  .credential-tree--nested {
+    margin-left: 0.45rem;
+    padding-left: 0.6rem;
+  }
+
+  .credential-tree__select {
+    gap: 0.5rem;
+    padding-inline: 0.55rem;
+  }
+
+  .credential-tree__open {
+    display: none;
+  }
+
   .vault-actions {
     display: grid;
     width: 100%;
@@ -338,6 +311,12 @@
   }
 }
 
+@media (max-width: 1100px) {
+  :root {
+    --inspector-width: 18rem;
+  }
+}
+
 @media (max-width: 420px) {
   .app-topbar {
     padding-inline: var(--space-2);
@@ -360,34 +339,5 @@
   .app-empty-state {
     min-height: 12rem;
     padding: 1.25rem 0.8rem;
-  }
-
-}
-
-@media (max-height: 560px) and (max-width: 760px) {
-  :root {
-    --mobile-nav-height: calc(4.25rem + env(safe-area-inset-bottom));
-  }
-
-  .app-sidebar {
-    min-height: var(--mobile-nav-height);
-    padding-top: 0.25rem;
-    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
-  }
-
-  .app-sidebar nav,
-  .sidebar-mobile-nav,
-  .sidebar-links,
-  .sidebar-link {
-    min-height: 3rem;
-  }
-
-  .sidebar-link svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .app-main {
-    padding-bottom: var(--mobile-nav-height);
   }
 }

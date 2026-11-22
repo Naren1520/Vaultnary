@@ -1,19 +1,14 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight, FolderOpen } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import Topbar from '../../components/ui/Topbar';
-import DataTable from '../../components/ui/DataTable';
 import SkeletonLoader from '../../components/ui/SkeletonLoader';
 import EmptyState from '../../components/feedback/EmptyState';
 import { useToast } from '../../components/ui/Toast';
 import { apiGet, apiPost } from '../../services/http-client';
-const columns = [
-    { key: 'name', header: 'Name', sortable: true, render: (r) => _jsx("span", { style: { fontWeight: 'var(--font-weight-medium)' }, children: r.name }) },
-    { key: 'description', header: 'Description', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }, children: r.description ?? '-' }) },
-    { key: 'created_at', header: 'Created', render: (r) => _jsx("span", { style: { color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }, children: new Date(r.created_at).toLocaleDateString() }), width: '9rem' },
-];
 export default function ProjectsPage() {
-    const navigate = useNavigate();
+    const { workspaceId: routeWorkspaceId } = useParams();
     const { showToast } = useToast();
     const [projects, setProjects] = useState([]);
     const [workspaces, setWorkspaces] = useState([]);
@@ -23,9 +18,19 @@ export default function ProjectsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [retryCount, setRetryCount] = useState(0);
     const editableWorkspaces = useMemo(() => workspaces.filter(({ role }) => role !== 'viewer'), [workspaces]);
+    const selectedWorkspace = workspaces.find(({ id }) => id === (routeWorkspaceId || workspaceId));
+    const canCreateProject = routeWorkspaceId
+        ? selectedWorkspace !== undefined && selectedWorkspace.role !== 'viewer'
+        : editableWorkspaces.some(({ id }) => id === workspaceId);
+    const visibleProjects = routeWorkspaceId
+        ? projects.filter((project) => project.workspace_id === routeWorkspaceId)
+        : projects;
     useEffect(() => {
         const ctrl = new AbortController();
+        setLoading(true);
+        setError('');
         Promise.all([
             apiGet('/api/v1/projects', { signal: ctrl.signal }),
             apiGet('/api/v1/workspaces', { signal: ctrl.signal }),
@@ -33,9 +38,17 @@ export default function ProjectsPage() {
             .then(([projectResponse, workspaceResponse]) => {
             setProjects(projectResponse.data);
             setWorkspaces(workspaceResponse.data);
-            setWorkspaceId((current) => current && workspaceResponse.data.some(({ id }) => id === current)
-                ? current
-                : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '');
+            if (routeWorkspaceId) {
+                setWorkspaceId(routeWorkspaceId);
+                setError(workspaceResponse.data.some(({ id }) => id === routeWorkspaceId)
+                    ? ''
+                    : 'Workspace not found or you do not have access.');
+            }
+            else {
+                setWorkspaceId((current) => current && workspaceResponse.data.some(({ id }) => id === current)
+                    ? current
+                    : workspaceResponse.data.find(({ role }) => role !== 'viewer')?.id ?? '');
+            }
         })
             .catch((cause) => {
             if (!ctrl.signal.aborted) {
@@ -47,7 +60,7 @@ export default function ProjectsPage() {
                 setLoading(false);
         });
         return () => ctrl.abort();
-    }, []);
+    }, [routeWorkspaceId, retryCount]);
     async function handleCreate(event) {
         event.preventDefault();
         const trimmedName = name.trim();
@@ -75,9 +88,13 @@ export default function ProjectsPage() {
             setSaving(false);
         }
     }
-    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Projects', href: '/app/projects' }] }), _jsxs("div", { className: "app-page-content", style: { padding: 'var(--space-4)', overflowY: 'auto', flex: 1 }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Organize" }), _jsx("h1", { children: "Projects" }), _jsx("p", { children: "Group related services and credentials into clear, manageable spaces." })] }), _jsxs("form", { onSubmit: handleCreate, "aria-label": "Create project", className: "app-create-form", style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }, children: [_jsx("label", { htmlFor: "project-name", style: visuallyHiddenStyle, children: "Project name" }), _jsx("input", { id: "project-name", required: true, maxLength: 100, value: name, onChange: (event) => setName(event.target.value), placeholder: "Project name", style: inputStyle }), _jsx("label", { htmlFor: "project-description", style: visuallyHiddenStyle, children: "Project description" }), _jsx("input", { id: "project-description", maxLength: 500, value: description, onChange: (event) => setDescription(event.target.value), placeholder: "Description (optional)", style: inputStyle }), _jsx("label", { htmlFor: "project-workspace", style: visuallyHiddenStyle, children: "Workspace" }), _jsxs("select", { id: "project-workspace", required: true, value: workspaceId, onChange: (event) => setWorkspaceId(event.target.value), disabled: editableWorkspaces.length === 0, style: inputStyle, children: [editableWorkspaces.length === 0 && _jsx("option", { value: "", children: "No editable workspace" }), editableWorkspaces.map((workspace) => (_jsx("option", { value: workspace.id, children: workspace.name }, workspace.id)))] }), _jsx("button", { type: "submit", disabled: saving || loading || editableWorkspaces.length === 0, style: buttonStyle, children: saving ? 'Creating…' : 'Create project' })] }), error && _jsx("p", { role: "alert", style: { color: 'var(--color-danger)', marginBottom: 'var(--space-3)' }, children: error }), loading
-                        ? _jsx(SkeletonLoader, { variant: "table-row", rows: 5 })
-                        : _jsx(DataTable, { columns: columns, rows: projects, getRowKey: (r) => r.id, onRowClick: (r) => navigate(`/app/projects/${r.id}`), caption: "Projects", emptyState: _jsx(EmptyState, { title: "No projects", message: "Create a project to start linking credentials." }) })] })] }));
+    return (_jsxs("div", { className: "app-route-page", children: [_jsx(Topbar, { breadcrumbs: [
+                    {
+                        label: selectedWorkspace?.name ?? 'Workspaces',
+                        href: '/app/workspaces',
+                    },
+                    { label: 'Projects', href: routeWorkspaceId ? `/app/workspaces/${routeWorkspaceId}/projects` : '/app/projects' },
+                ], showSearch: false }), _jsxs("main", { className: "app-page-content", children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: selectedWorkspace?.name ?? 'Organize' }), _jsx("h1", { children: "Projects" }), _jsx("p", { children: "Projects organize the services and vaults within this workspace." })] }), _jsxs("form", { onSubmit: handleCreate, "aria-label": "Create project", className: "app-create-form", style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }, children: [_jsx("label", { htmlFor: "project-name", style: visuallyHiddenStyle, children: "Project name" }), _jsx("input", { id: "project-name", required: true, maxLength: 100, value: name, onChange: (event) => setName(event.target.value), placeholder: "Project name", style: inputStyle }), _jsx("label", { htmlFor: "project-description", style: visuallyHiddenStyle, children: "Project description" }), _jsx("input", { id: "project-description", maxLength: 500, value: description, onChange: (event) => setDescription(event.target.value), placeholder: "Description (optional)", style: inputStyle }), !routeWorkspaceId && (_jsxs(_Fragment, { children: [_jsx("label", { htmlFor: "project-workspace", style: visuallyHiddenStyle, children: "Workspace" }), _jsxs("select", { id: "project-workspace", required: true, value: workspaceId, onChange: (event) => setWorkspaceId(event.target.value), disabled: editableWorkspaces.length === 0, style: inputStyle, children: [editableWorkspaces.length === 0 && _jsx("option", { value: "", children: "Create a workspace first" }), editableWorkspaces.map((workspace) => (_jsx("option", { value: workspace.id, children: workspace.name }, workspace.id)))] })] })), _jsx("button", { type: "submit", disabled: saving || loading || !canCreateProject, style: buttonStyle, children: saving ? 'Creating…' : 'Create project' })] }), error && (_jsxs("div", { className: "app-request-error", role: "alert", children: [_jsx("p", { children: error }), _jsx("button", { type: "button", onClick: () => setRetryCount((count) => count + 1), children: "Retry" })] })), loading ? (_jsx(SkeletonLoader, { variant: "table-row", rows: 5 })) : visibleProjects.length === 0 && !error ? (_jsx("section", { className: "resource-empty-panel", children: _jsx(EmptyState, { title: "No projects in this workspace yet", message: "Create a project to organize its services and vaults.", icon: _jsx(FolderOpen, { size: 32 }) }) })) : (_jsx("ul", { className: "resource-card-grid", children: visibleProjects.map((project) => (_jsx("li", { children: _jsxs(Link, { className: "resource-card", to: `/app/projects/${project.id}`, children: [_jsx("span", { className: "resource-card__icon", children: _jsx(FolderOpen, { size: 20, "aria-hidden": "true" }) }), _jsxs("span", { className: "resource-card__body", children: [_jsx("strong", { children: project.name }), _jsx("span", { children: project.description || `Created ${new Date(project.created_at).toLocaleDateString()}` })] }), _jsx(ArrowRight, { size: 18, "aria-hidden": "true" })] }) }, project.id))) }))] })] }));
 }
 const inputStyle = {
     flex: '1 1 11rem',

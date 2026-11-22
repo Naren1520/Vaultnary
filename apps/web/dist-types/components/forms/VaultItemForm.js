@@ -70,7 +70,7 @@ function uint8ToBase64(arr) {
     return btoa(bin);
 }
 /* VaultItemForm                                                        */
-export default function VaultItemForm({ itemId, onSuccess }) {
+export default function VaultItemForm({ vaultId, itemId, onSuccess }) {
     const isEditMode = Boolean(itemId);
     /* Core form state */
     const [name, setName] = useState('');
@@ -161,6 +161,7 @@ export default function VaultItemForm({ itemId, onSuccess }) {
             const body = {
                 encrypted_metadata: uint8ToBase64(sealed.encryptedMetadata),
                 encrypted_payload: uint8ToBase64(sealed.encryptedPayload),
+                ...(!isEditMode ? { vault_id: vaultId } : {}),
                 ...(sealed.encryptedDek
                     ? { encrypted_dek: uint8ToBase64(sealed.encryptedDek) }
                     : {}),

@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useRef, useState } from 'react';
-import { Download, Plus, Upload } from 'lucide-react';
+import { Download, GitBranch, Plus, Upload } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import Topbar from '../../components/ui/Topbar';
 import Inspector from '../../components/ui/Inspector';
 import EmptyState from '../../components/feedback/EmptyState';
@@ -26,6 +27,7 @@ const actionStyle = {
     cursor: 'pointer',
 };
 export default function VaultPage() {
+    const { vaultId } = useParams();
     const isUnlocked = useVaultStore((s) => s.isUnlocked);
     const privateKey = useVaultStore((s) => s.privateKey);
     const [, forceUpdate] = useState(0);
@@ -40,11 +42,17 @@ export default function VaultPage() {
         forceUpdate((n) => n + 1);
     }
     async function handleExport() {
+        if (!vaultId) {
+            setArchiveError('Select a service vault before exporting.');
+            return;
+        }
         setArchiveBusy(true);
         setArchiveError('');
         setArchiveNotice('');
         try {
-            const response = await apiPost('/api/v1/vault/export');
+            const response = await apiPost('/api/v1/vault/export', {
+                vault_id: vaultId,
+            });
             if (!response.data || response.data.version !== 2) {
                 throw new Error('The server returned an invalid vault archive.');
             }
@@ -69,6 +77,10 @@ export default function VaultPage() {
         }
     }
     async function handleImport(event) {
+        if (!vaultId) {
+            setArchiveError('Select a service vault before importing an archive.');
+            return;
+        }
         const file = event.currentTarget.files?.[0];
         event.currentTarget.value = '';
         if (!file)
@@ -86,7 +98,10 @@ export default function VaultPage() {
         setArchiveNotice('');
         try {
             const archive = await verifyVaultArchive(JSON.parse(await file.text()), privateKey);
-            const response = await apiPost('/api/v1/vault/import', archive);
+            const response = await apiPost('/api/v1/vault/import', {
+                vault_id: vaultId,
+                archive,
+            });
             setListKey((key) => key + 1);
             setArchiveNotice(`${response.data.imported} credential${response.data.imported === 1 ? '' : 's'} imported.`);
         }
@@ -113,7 +128,13 @@ export default function VaultPage() {
     if (!isUnlocked) {
         return _jsx(VaultUnlockScreen, { onUnlocked: handleUnlocked });
     }
-    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, children: [_jsx(Topbar, { breadcrumbs: [{ label: 'Vault', href: '/app/vault' }], actionsSlot: _jsxs("div", { className: "vault-actions", children: [_jsxs("button", { type: "button", onClick: handleExport, disabled: archiveBusy, style: actionStyle, children: [_jsx(Download, { size: 14, "aria-hidden": "true" }), "Export"] }), _jsxs("button", { type: "button", onClick: () => fileInput.current?.click(), disabled: archiveBusy, style: actionStyle, children: [_jsx(Upload, { size: 14, "aria-hidden": "true" }), "Import backup"] }), _jsxs("button", { type: "button", onClick: () => setShowEnvImport(true), style: actionStyle, children: [_jsx(Upload, { size: 14, "aria-hidden": "true" }), "Import .env"] }), _jsx("input", { ref: fileInput, type: "file", accept: "application/json,.json", "aria-label": "Import encrypted vault archive", onChange: handleImport, style: { display: 'none' } }), _jsxs("button", { type: "button", onClick: () => setShowCreate(true), style: {
+    if (!vaultId) {
+        return (_jsx("div", { role: "alert", style: { padding: 'var(--space-4)', color: 'var(--color-danger)' }, children: "A service vault must be selected to open credential contents." }));
+    }
+    return (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }, children: [_jsx(Topbar, { breadcrumbs: [
+                    { label: 'Vaults', href: '/app/vault' },
+                    { label: 'Service vault', href: `/app/vaults/${vaultId}` },
+                ], actionsSlot: _jsxs("div", { className: "vault-actions", children: [_jsxs(Link, { to: `/app/hierarchy/${vaultId}`, className: "app-secondary-action", children: [_jsx(GitBranch, { size: 14, "aria-hidden": "true" }), "Credential hierarchy"] }), _jsxs("button", { type: "button", onClick: handleExport, disabled: archiveBusy, style: actionStyle, children: [_jsx(Download, { size: 14, "aria-hidden": "true" }), "Export"] }), _jsxs("button", { type: "button", onClick: () => fileInput.current?.click(), disabled: archiveBusy, style: actionStyle, children: [_jsx(Upload, { size: 14, "aria-hidden": "true" }), "Import backup"] }), _jsxs("button", { type: "button", onClick: () => setShowEnvImport(true), style: actionStyle, children: [_jsx(Upload, { size: 14, "aria-hidden": "true" }), "Import .env"] }), _jsx("input", { ref: fileInput, type: "file", accept: "application/json,.json", "aria-label": "Import encrypted vault archive", onChange: handleImport, style: { display: 'none' } }), _jsxs("button", { type: "button", onClick: () => setShowCreate(true), style: {
                                 ...actionStyle,
                                 padding: 'var(--space-2) var(--space-4)',
                                 backgroundColor: 'var(--color-text)',
@@ -123,7 +144,7 @@ export default function VaultPage() {
                     padding: 'var(--space-2) var(--space-4)',
                     color: archiveError ? 'var(--color-danger)' : 'var(--color-text-muted)',
                     fontSize: 'var(--text-sm)',
-                }, children: archiveError || (archiveBusy ? 'Processing archive...' : archiveNotice) })), _jsxs("div", { className: "vault-page-content", style: { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }, children: [_jsxs("div", { style: { flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Private by design" }), _jsx("h1", { children: "Your vault" }), _jsx("p", { children: "Your encrypted credentials, ready when you need them." })] }), _jsx(VaultList, { onCreateCredential: () => setShowCreate(true) }, listKey)] }), _jsx(Inspector, { children: _jsx("div", { style: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }, children: _jsx(EmptyState, { title: "Nothing selected", message: "Click a credential to view its details." }) }) })] }), showCreate && (_jsx("div", { role: "presentation", className: "app-modal-overlay", onClick: (e) => { if (e.target === e.currentTarget)
+                }, children: archiveError || (archiveBusy ? 'Processing archive...' : archiveNotice) })), _jsxs("div", { className: "vault-page-content", style: { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }, children: [_jsxs("div", { style: { flex: 1, overflowY: 'auto', padding: 'var(--space-4)' }, children: [_jsxs("header", { className: "app-page-heading", children: [_jsx("p", { className: "app-page-heading__eyebrow", children: "Private by design" }), _jsx("h1", { children: "Service vault" }), _jsx("p", { children: "Encrypted credentials for this service." })] }), _jsx(VaultList, { vaultId: vaultId, onCreateCredential: () => setShowCreate(true) }, `${vaultId}:${listKey}`)] }), _jsx(Inspector, { children: _jsx("div", { style: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }, children: _jsx(EmptyState, { title: "Nothing selected", message: "Click a credential to view its details." }) }) })] }), showCreate && (_jsx("div", { role: "presentation", className: "app-modal-overlay", onClick: (e) => { if (e.target === e.currentTarget)
                     setShowCreate(false); }, style: {
                     position: 'fixed',
                     inset: 0,
@@ -152,5 +173,5 @@ export default function VaultPage() {
                                 color: 'var(--color-text-muted)',
                                 fontSize: '1.25rem',
                                 lineHeight: 1,
-                            }, children: "\u00D7" }), _jsx(VaultItemForm, { onSuccess: handleCreated })] }) })), showEnvImport && (_jsx(EnvImportDialog, { onClose: handleEnvImportClose, onImported: handleEnvImported }))] }));
+                            }, children: "\u00D7" }), _jsx(VaultItemForm, { vaultId: vaultId, onSuccess: handleCreated })] }) })), showEnvImport && (_jsx(EnvImportDialog, { vaultId: vaultId, onClose: handleEnvImportClose, onImported: handleEnvImported }))] }));
 }

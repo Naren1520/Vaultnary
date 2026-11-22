@@ -256,7 +256,7 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 ### Authentication (`/auth/`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | /auth/register | No | Register; hash password, insert user+vault, send verification email |
+| POST | /auth/register | No | Register; hash password, create user and personal workspace, send verification email |
 | GET | /auth/verify-email | No | Verify email token (24-hour expiry) |
 | POST | /auth/resend-verification | No | Resend verification; rate-limited 3/email/60min |
 | POST | /auth/login | No | Authenticate; set HttpOnly cookie, return CSRF token |
@@ -273,8 +273,8 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 ### Vault Items (`/vault/`)
 | Method | Path | Auth | Min Role | Description |
 |--------|------|------|----------|-------------|
-| POST | /vault/items | Yes | -| Create item; validate fields + type-specific metadata |
-| GET | /vault/items | Yes | Viewer | List with cursor pagination (default 20, max 100) |
+| POST | /vault/items | Yes | Editor | Create item in the selected service vault; validate encrypted fields |
+| GET | /vault/items | Yes | Viewer | List selected vault with cursor pagination (default 20, max 100) |
 | GET | /vault/items/:id | Yes | Viewer | Get metadata; update last_accessed_at; audit |
 | PUT | /vault/items/:id | Yes | Editor | Update fields |
 | DELETE | /vault/items/:id | Yes | Owner | Cascade delete with confirm:true |
@@ -283,30 +283,37 @@ All routes are under `/api/v1/`. Authenticated routes require a valid `vault_ses
 | POST | /vault/items/:id/favorite | Yes | Viewer | Upsert favorite |
 | DELETE | /vault/items/:id/favorite | Yes | Viewer | Remove favorite |
 | GET | /vault/recent | Yes | Viewer | 20 most recently accessed |
-| GET | /vault/items/:id/children | Yes | Viewer | Direct children in tree |
-| GET | /vault/tree | Yes | Viewer | Recursive CTE tree (depth=1-10) |
+| GET | /vault/items/:id/children | Yes | Viewer | Direct children in the selected vault |
+| GET | /vault/tree | Yes | Viewer | Selected vault's recursive CTE tree (depth=1-10) |
 | POST | /vault/items/:id/usage | Yes | Editor | Link to project/service |
 | GET | /vault/items/:id/usage | Yes | Viewer | List usage links |
 | DELETE | /vault/items/:id/usage/:uid | Yes | Editor | Remove usage link |
 | POST | /vault/items/:id/invitations | Yes | Co-owner | Send share invitation |
 | GET | /vault/items/:id/invitations | Yes | Co-owner | List invitations |
 | DELETE | /vault/items/:id/permissions/:uid | Yes | Co-owner | Remove collaborator |
-| POST | /vault/export | Yes | - | Download versioned archive; secret values remain encrypted |
-| POST | /vault/import | Yes | - | Import a validated archive (maximum 50 MB); records an audit event |
+| POST | /vault/export | Yes | Viewer | Download selected vault as a versioned archive; values remain encrypted |
+| POST | /vault/import | Yes | Editor | Import a validated archive into the selected vault (maximum 50 MB) |
 
 The browser verifies each encrypted payload with the unlocked user's private key
 before submitting an import. The API validates archive structure, references,
 and size, then inserts all items transactionally; archive paths are not extracted.
 
-### Projects & Services
+### Workspace Resources
+The resource hierarchy is **workspace → project → service → vault → credential**.
+Credential parent/child hierarchy is optional and confined to one vault. Deleting a
+project or service that contains vaults requires explicit confirmation.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| POST/GET | /projects | Create / list owned projects |
+| POST/GET | /projects | Create / list projects in accessible workspaces |
 | GET/PUT/DELETE | /projects/:id | Get / update / delete project |
 | GET | /projects/:id/credentials | Items linked to this project |
-| POST/GET | /services | Create / list owned services |
+| POST/GET | /services | Create / list services; a project is required |
 | GET/PUT/DELETE | /services/:id | Get / update / delete service |
 | GET | /services/:id/credentials | Items linked to this service |
+| GET/POST | /services/:id/vaults | List / create vaults within a service |
+| GET | /vaults | List service vaults visible to the current user |
+| DELETE | /vaults/:id | Delete a selected vault with explicit confirmation |
 
 ### Workspaces
 | Method | Path | Description |

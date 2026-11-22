@@ -40,7 +40,7 @@ describe('EnvImportDialog', () => {
         mocks.apiPost.mockResolvedValue({ data: { imported: 1 } });
     });
     it('encrypts variables in the browser and never sends plaintext to the API', async () => {
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Environment file contents'), {
             target: { value: 'DATABASE_URL=super-secret-value' },
         });
@@ -49,6 +49,7 @@ describe('EnvImportDialog', () => {
         const [path, request] = mocks.apiPost.mock.calls[0];
         expect(path).toBe('/api/v1/vault/import-env');
         expect(request).toEqual({
+            vault_id: 'vault-id',
             items: [{
                     encrypted_metadata: 'AQID',
                     encrypted_payload: 'BAUG',
@@ -62,7 +63,7 @@ describe('EnvImportDialog', () => {
         expect(onClose).toHaveBeenCalled();
     });
     it('blocks import while parse issues such as duplicate keys remain', () => {
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Environment file contents'), {
             target: { value: 'API_KEY=first\nAPI_KEY=second' },
         });
@@ -71,7 +72,7 @@ describe('EnvImportDialog', () => {
         expect(mocks.apiPost).not.toHaveBeenCalled();
     });
     it('detects CSV content and encrypts the selected values before sending', async () => {
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Environment file contents'), {
             target: { value: 'NAME,VALUE\nAPI_TOKEN,"csv-secret"' },
         });
@@ -89,7 +90,7 @@ describe('EnvImportDialog', () => {
         Object.defineProperty(file, 'text', {
             value: async () => 'NAME,VALUE\nCSV_TOKEN,csv-secret',
         });
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Choose an environment file'), {
             target: { files: [file] },
         });
@@ -102,7 +103,7 @@ describe('EnvImportDialog', () => {
             encryptedPayload: new Uint8Array(64 * 1024 + 1),
             encryptedDek: new Uint8Array(512),
         });
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Environment file contents'), {
             target: { value: 'LARGE=value' },
         });
@@ -114,7 +115,7 @@ describe('EnvImportDialog', () => {
     });
     it('reports a failed atomic save without claiming a partial import', async () => {
         mocks.apiPost.mockRejectedValueOnce(new Error('Request failed'));
-        render(_jsx(EnvImportDialog, { onClose: onClose, onImported: onImported }));
+        render(_jsx(EnvImportDialog, { vaultId: "vault-id", onClose: onClose, onImported: onImported }));
         fireEvent.change(screen.getByLabelText('Environment file contents'), {
             target: { value: 'FIRST=one\nSECOND=two\nTHIRD=three' },
         });

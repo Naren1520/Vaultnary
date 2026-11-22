@@ -4,18 +4,19 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ErrorDetail},
     middleware::auth::AuthUser,
+    routes::workspaces::{require_workspace_editor, workspace_member_role},
     state::AppState,
 };
-use domain::{check_cycle, validate_payload_metadata, CredentialType};
+use domain::{validate_payload_metadata, CredentialType};
 use shared::AppError;
 
 /* Maximum sizes per spec */
@@ -30,6 +31,31 @@ const MAX_ARCHIVE_ITEMS: usize = 100_000;
 const DEFAULT_LIMIT: i64 = 20;
 const MAX_LIMIT: i64 = 100;
 
+pub(crate) async fn require_vault_member(
+    db: &PgPool,
+    vault_id: Uuid,
+    user_id: Uuid,
+    require_editor: bool,
+) -> Result<(), ApiError> {
+    let workspace_id: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM vaults WHERE id = $1")
+            .bind(vault_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    let workspace_id = workspace_id
+        .map(|(workspace_id,)| workspace_id)
+        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+
+    if require_editor {
+        require_workspace_editor(db, workspace_id, user_id).await
+    } else {
+        workspace_member_role(db, workspace_id, user_id)
+            .await
+            .map(|_| ())
+    }
+}
+
 /* Response types                                                       */
 
 #[derive(Serialize)]
@@ -43,15 +69,39 @@ struct VaultItemMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     payload_metadata: Option<serde_json::Value>,
     is_favorite: bool,
-    last_accessed_at: Option<String>,
-    created_at: String,
-    updated_at: String,
+    #[serde(serialize_with = "serialize_optional_timestamp")]
+    last_accessed_at: Option<OffsetDateTime>,
+    #[serde(serialize_with = "serialize_timestamp")]
+    created_at: OffsetDateTime,
+    #[serde(serialize_with = "serialize_timestamp")]
+    updated_at: OffsetDateTime,
     #[serde(skip_serializing_if = "Option::is_none")]
     inherited_from: Option<InheritedFrom>,
     encrypted_metadata: Option<String>,
     encrypted_payload: Option<String>,
     encrypted_dek: Option<String>,
     metadata_locked: bool,
+}
+
+fn serialize_timestamp<S>(value: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let value = value.format(&Rfc3339).map_err(serde::ser::Error::custom)?;
+    serializer.serialize_str(&value)
+}
+
+fn serialize_optional_timestamp<S>(
+    value: &Option<OffsetDateTime>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match value {
+        Some(value) => serialize_timestamp(value, serializer),
+        None => serializer.serialize_none(),
+    }
 }
 
 #[derive(Serialize)]
@@ -65,6 +115,12 @@ struct InheritedFrom {
 pub(super) struct VaultArchive {
     version: u32,
     items: Vec<ArchiveItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct VaultSelectionRequest {
+    vault_id: Uuid,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -172,16 +228,49 @@ pub async fn create_item(
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
     validate_encrypted_item_fields(&body, true)?;
-    let parent_item_id: Option<Uuid> = body
-        .get("parent_item_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| Uuid::parse_str(s).ok());
+    let vault_id = body
+        .get("vault_id")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .ok_or_else(|| {
+            ApiError::with_details(
+                AppError::UnprocessableEntity("vault_id: must be a UUID".into()),
+                vec![ErrorDetail {
+                    field: "vault_id".into(),
+                    rule: "uuid".into(),
+                }],
+            )
+        })?;
+    let db = state.db();
+    require_vault_member(db, vault_id, auth.user_id, true).await?;
+
+    let parent_item_id = match body.get("parent_item_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => {
+            let Some(value) = value.as_str() else {
+                return Err(ApiError::with_details(
+                    AppError::UnprocessableEntity("parent_item_id: must be a UUID or null".into()),
+                    vec![ErrorDetail {
+                        field: "parent_item_id".into(),
+                        rule: "uuid_or_null".into(),
+                    }],
+                ));
+            };
+            Some(Uuid::parse_str(value).map_err(|_| {
+                ApiError::with_details(
+                    AppError::UnprocessableEntity("parent_item_id: must be a UUID or null".into()),
+                    vec![ErrorDetail {
+                        field: "parent_item_id".into(),
+                        rule: "uuid_or_null".into(),
+                    }],
+                )
+            })?)
+        }
+    };
     let encrypted_payload: Option<&str> = body.get("encrypted_payload").and_then(|v| v.as_str());
     let encrypted_metadata: Option<&str> =
         body.get("encrypted_metadata").and_then(|v| v.as_str());
     let encrypted_dek: Option<&str> = body.get("encrypted_dek").and_then(|v| v.as_str());
-
-    let db = state.db();
 
     let key_material_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM vault_key_material WHERE user_id = $1)")
@@ -195,17 +284,24 @@ pub async fn create_item(
         )));
     }
 
-    /* Verify the user owns a vault */
-    let vault: Option<(Uuid,)> =
-        sqlx::query_as("SELECT id FROM vaults WHERE owner_id = $1 LIMIT 1")
-            .bind(auth.user_id)
-            .fetch_optional(db)
-            .await
-            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
-    let vault_id = vault
-        .map(|(id,)| id)
-        .ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    if let Some(parent_id) = parent_item_id {
+        let parent_accessible: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+               SELECT 1 FROM vault_items vi
+               JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $3
+               WHERE vi.id = $1 AND vi.vault_id = $2
+             )",
+        )
+        .bind(parent_id)
+        .bind(vault_id)
+        .bind(auth.user_id)
+        .fetch_one(db)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+        if !parent_accessible {
+            return Err(ApiError::new(AppError::NotFound));
+        }
+    }
 
     let item_id = Uuid::new_v4();
     let encrypted_payload_bytes: Option<Vec<u8>> =
@@ -293,8 +389,8 @@ pub async fn create_item(
         payload_metadata: None,
         is_favorite: false,
         last_accessed_at: None,
-        created_at: now.to_string(),
-        updated_at: now.to_string(),
+        created_at: now,
+        updated_at: now,
         inherited_from: None,
         encrypted_metadata: encrypted_metadata_bytes.map(hex::encode),
         encrypted_payload: encrypted_payload_bytes.map(hex::encode),
@@ -312,6 +408,7 @@ pub async fn create_item(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct EnvImportRequest {
+    vault_id: Uuid,
     items: Vec<EncryptedEnvItem>,
 }
 
@@ -392,13 +489,7 @@ pub(super) async fn import_env(
         )));
     }
 
-    let vault_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM vaults WHERE owner_id = $1 LIMIT 1")
-            .bind(auth.user_id)
-            .fetch_optional(db)
-            .await
-            .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
-    let vault_id = vault_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    require_vault_member(db, body.vault_id, auth.user_id, true).await?;
 
     let now = OffsetDateTime::now_utc();
     let mut tx = db
@@ -415,7 +506,7 @@ pub(super) async fn import_env(
              VALUES ($1, $2, 'Encrypted credential', 'custom', NULL, '{}', $3, NULL, NULL, $4, $5, $5)",
         )
         .bind(item_id)
-        .bind(vault_id)
+        .bind(body.vault_id)
         .bind(&item.encrypted_payload)
         .bind(&item.encrypted_metadata)
         .bind(now)
@@ -472,6 +563,7 @@ pub(super) async fn import_env(
 
 #[derive(Deserialize)]
 pub struct ListQuery {
+    vault_id: Uuid,
     cursor: Option<Uuid>,
     limit: Option<i64>,
 }
@@ -483,6 +575,7 @@ pub async fn list_items(
 ) -> Result<impl IntoResponse, ApiError> {
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT).max(1);
     let db = state.db();
+    require_vault_member(db, params.vault_id, auth.user_id, false).await?;
 
     /* List responses expose ciphertext only; credential labels are decrypted in the browser. */
     type ItemRow = (
@@ -506,11 +599,13 @@ pub async fn list_items(
              JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
              LEFT JOIN credential_key_envelopes cke
                ON cke.item_id = vi.id AND cke.user_id = $1
-             WHERE vi.created_at < (SELECT created_at FROM vault_items WHERE id = $2)
+             WHERE vi.vault_id = $2
+               AND vi.created_at < (SELECT created_at FROM vault_items WHERE id = $3 AND vault_id = $2)
              ORDER BY vi.created_at DESC
-             LIMIT $3",
+             LIMIT $4",
         )
         .bind(auth.user_id)
+        .bind(params.vault_id)
         .bind(cursor)
         .bind(limit + 1)
         .fetch_all(db)
@@ -525,10 +620,12 @@ pub async fn list_items(
              JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
              LEFT JOIN credential_key_envelopes cke
                ON cke.item_id = vi.id AND cke.user_id = $1
+             WHERE vi.vault_id = $2
              ORDER BY vi.created_at DESC
-             LIMIT $2",
+             LIMIT $3",
         )
         .bind(auth.user_id)
+        .bind(params.vault_id)
         .bind(limit + 1)
         .fetch_all(db)
         .await
@@ -567,9 +664,9 @@ pub async fn list_items(
                     notes: None,
                     payload_metadata: None,
                     is_favorite: is_fav,
-                    last_accessed_at: last_acc.map(|t| t.to_string()),
-                    created_at: created.to_string(),
-                    updated_at: updated.to_string(),
+                    last_accessed_at: last_acc,
+                    created_at: created,
+                    updated_at: updated,
                     inherited_from: None,
                     metadata_locked: encrypted_metadata.is_none(),
                     encrypted_metadata: encrypted_metadata.map(hex::encode),
@@ -706,9 +803,9 @@ pub async fn get_item(
         notes: None,
         payload_metadata: None,
         is_favorite: is_fav,
-        last_accessed_at: last_acc.map(|t| t.to_string()),
-        created_at: created.to_string(),
-        updated_at: updated.to_string(),
+        last_accessed_at: last_acc,
+        created_at: created,
+        updated_at: updated,
         inherited_from,
         metadata_locked: encrypted_metadata.is_none(),
         encrypted_metadata: encrypted_metadata.map(hex::encode),
@@ -954,26 +1051,28 @@ pub async fn search_items(
 
     let results: Vec<VaultItemMeta> = rows
         .into_iter()
-        .map(|(id, parent_id, is_fav, last_acc, created, updated, metadata, payload, dek)| {
-            VaultItemMeta {
-                id,
-                name: "Encrypted credential".into(),
-                credential_type: "custom".into(),
-                parent_item_id: parent_id,
-                tags: Vec::new(),
-                notes: None,
-                payload_metadata: None,
-                is_favorite: is_fav,
-                last_accessed_at: last_acc.map(|value| value.to_string()),
-                created_at: created.to_string(),
-                updated_at: updated.to_string(),
-                inherited_from: None,
-                metadata_locked: metadata.is_none(),
-                encrypted_metadata: metadata.map(hex::encode),
-                encrypted_payload: payload.map(hex::encode),
-                encrypted_dek: dek.map(hex::encode),
-            }
-        })
+        .map(
+            |(id, parent_id, is_fav, last_acc, created, updated, metadata, payload, dek)| {
+                VaultItemMeta {
+                    id,
+                    name: "Encrypted credential".into(),
+                    credential_type: "custom".into(),
+                    parent_item_id: parent_id,
+                    tags: Vec::new(),
+                    notes: None,
+                    payload_metadata: None,
+                    is_favorite: is_fav,
+                    last_accessed_at: last_acc,
+                    created_at: created,
+                    updated_at: updated,
+                    inherited_from: None,
+                    metadata_locked: metadata.is_none(),
+                    encrypted_metadata: metadata.map(hex::encode),
+                    encrypted_payload: payload.map(hex::encode),
+                    encrypted_dek: dek.map(hex::encode),
+                }
+            },
+        )
         .collect();
 
     Ok(Json(serde_json::json!({ "data": results })))
@@ -1035,9 +1134,9 @@ pub async fn list_favorites(
                     notes: None,
                     payload_metadata: None,
                     is_favorite: true,
-                    last_accessed_at: last_acc.map(|t| t.to_string()),
-                    created_at: created.to_string(),
-                    updated_at: updated.to_string(),
+                    last_accessed_at: last_acc,
+                    created_at: created,
+                    updated_at: updated,
                     inherited_from: None,
                     metadata_locked: encrypted_metadata.is_none(),
                     encrypted_metadata: encrypted_metadata.map(hex::encode),
@@ -1188,9 +1287,9 @@ pub async fn recent_items(
                     notes: None,
                     payload_metadata: None,
                     is_favorite: is_fav,
-                    last_accessed_at: last_acc.map(|t| t.to_string()),
-                    created_at: created.to_string(),
-                    updated_at: updated.to_string(),
+                    last_accessed_at: last_acc,
+                    created_at: created,
+                    updated_at: updated,
                     inherited_from: None,
                     metadata_locked: encrypted_metadata.is_none(),
                     encrypted_metadata: encrypted_metadata.map(hex::encode),
@@ -1350,8 +1449,10 @@ fn validate_archive(archive: VaultArchive) -> Result<Vec<ValidatedArchiveItem>, 
 pub async fn export_vault(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
+    Json(selection): Json<VaultSelectionRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
+    require_vault_member(db, selection.vault_id, auth.user_id, false).await?;
     record_archive_event(db, auth.user_id, "export.initiated").await?;
 
     type ExportRow = (
@@ -1366,12 +1467,15 @@ pub async fn export_vault(
                 vi.encrypted_payload, cke.encrypted_dek
          FROM vault_items vi
          JOIN vaults v ON v.id = vi.vault_id
+         JOIN credential_permissions cp
+           ON cp.item_id = vi.id AND cp.user_id = $1 AND cp.role = 'owner'
          LEFT JOIN credential_key_envelopes cke
            ON cke.item_id = vi.id AND cke.user_id = $1
-         WHERE v.owner_id = $1
+         WHERE v.id = $2
          ORDER BY vi.created_at, vi.id",
     )
     .bind(auth.user_id)
+    .bind(selection.vault_id)
     .fetch_all(db)
     .await
     .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
@@ -1400,31 +1504,35 @@ pub async fn export_vault(
 }
 
 /// POST /api/v1/vault/import
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct VaultImportRequest {
+    vault_id: Uuid,
+    archive: VaultArchive,
+}
+
 pub(super) async fn import_vault(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Json(archive): Json<VaultArchive>,
+    Json(request): Json<VaultImportRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
+    require_vault_member(db, request.vault_id, auth.user_id, true).await?;
     record_archive_event(db, auth.user_id, "import.initiated").await?;
-    let items = validate_archive(archive)?;
+    let items = validate_archive(request.archive)?;
 
     let mut tx = db
         .begin()
         .await
         .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
-    let vault_id: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM vaults
-         WHERE owner_id = $1
-         ORDER BY created_at, id
-         LIMIT 1
-         FOR UPDATE",
-    )
-    .bind(auth.user_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
-    let (vault_id,) = vault_id.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let vault: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM vaults WHERE id = $1 FOR UPDATE")
+        .bind(request.vault_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
+    if vault.is_none() {
+        return Err(ApiError::new(AppError::NotFound));
+    }
 
     if !items.is_empty() {
         let item_ids = items.iter().map(|item| item.id).collect::<Vec<_>>();
@@ -1454,7 +1562,7 @@ pub(super) async fn import_vault(
                      $3, NULL, NULL, $4, $5, $5)",
         )
         .bind(item.id)
-        .bind(vault_id)
+        .bind(request.vault_id)
         .bind(&item.encrypted_payload)
         .bind(&item.encrypted_metadata)
         .bind(now)
@@ -1499,7 +1607,7 @@ pub(super) async fn import_vault(
             )
             .bind(parent_item_id)
             .bind(item.id)
-            .bind(vault_id)
+            .bind(request.vault_id)
             .execute(&mut *tx)
             .await
             .map_err(|error| ApiError::new(AppError::Internal(error.into())))?;
@@ -1606,7 +1714,9 @@ pub(super) fn decode_base64_or_hex(s: &str) -> Option<Vec<u8>> {
 mod archive_tests {
     use super::{
         decode_base64_or_hex, validate_archive, ArchiveItem, EnvImportRequest, VaultArchive,
+        VaultItemMeta,
     };
+    use time::OffsetDateTime;
     use uuid::Uuid;
 
     fn archive_item(id: Uuid, parent_item_id: Option<Uuid>) -> ArchiveItem {
@@ -1617,6 +1727,33 @@ mod archive_tests {
             encrypted_payload: None,
             encrypted_dek: None,
         }
+    }
+
+    #[test]
+    fn vault_item_timestamps_serialize_as_rfc3339() {
+        let timestamp = OffsetDateTime::from_unix_timestamp(1_700_000_000).unwrap();
+        let item = VaultItemMeta {
+            id: Uuid::new_v4(),
+            name: "Encrypted credential".into(),
+            credential_type: "custom".into(),
+            parent_item_id: None,
+            tags: Vec::new(),
+            notes: None,
+            payload_metadata: None,
+            is_favorite: false,
+            last_accessed_at: Some(timestamp),
+            created_at: timestamp,
+            updated_at: timestamp,
+            inherited_from: None,
+            encrypted_metadata: None,
+            encrypted_payload: None,
+            encrypted_dek: None,
+            metadata_locked: true,
+        };
+
+        let serialized = serde_json::to_value(item).unwrap();
+        assert_eq!(serialized["created_at"], "2023-11-14T22:13:20Z");
+        assert_eq!(serialized["last_accessed_at"], "2023-11-14T22:13:20Z");
     }
 
     #[test]
@@ -1635,6 +1772,7 @@ mod archive_tests {
     #[test]
     fn env_import_request_rejects_plaintext_fields() {
         let request = serde_json::json!({
+            "vault_id": Uuid::new_v4(),
             "items": [{
                 "encrypted_metadata": "ciphertext",
                 "encrypted_payload": "ciphertext",
@@ -1649,6 +1787,7 @@ mod archive_tests {
     #[test]
     fn env_import_request_accepts_only_encrypted_item_fields() {
         let request = serde_json::json!({
+            "vault_id": Uuid::new_v4(),
             "items": [{
                 "encrypted_metadata": "ciphertext",
                 "encrypted_payload": "ciphertext",

@@ -222,6 +222,7 @@ pub async fn delete_project(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Path(project_id): Path<Uuid>,
+    body: Option<Json<serde_json::Value>>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
 
@@ -238,6 +239,31 @@ pub async fn delete_project(
     let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
     if !role.can_manage() {
         return Err(ApiError::new(AppError::Forbidden));
+    }
+
+    let vault_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM vaults v
+         JOIN services s ON s.id = v.service_id
+         WHERE s.project_id = $1",
+    )
+    .bind(project_id)
+    .fetch_one(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let confirmed = body
+        .and_then(|Json(value)| value.get("confirm").and_then(serde_json::Value::as_bool))
+        .unwrap_or(false);
+    if vault_count > 0 && !confirmed {
+        return Err(ApiError::with_details(
+            AppError::UnprocessableEntity(
+                "confirm: deleting this project also deletes its services, vaults, and credentials"
+                    .into(),
+            ),
+            vec![ErrorDetail {
+                field: "confirm".into(),
+                rule: "required_true_for_cascade".into(),
+            }],
+        ));
     }
 
     let mut tx = db

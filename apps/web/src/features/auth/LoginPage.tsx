@@ -47,7 +47,7 @@ export default function LoginPage() {
         password,
       } satisfies LoginRequest)
       setCsrfToken(res.csrf_token)
-      navigate('/app/vault', { replace: true })
+      navigate('/app/workspaces', { replace: true })
     } catch (err) {
       if (err instanceof ValidationError) {
         const mapped: Record<string, string> = {}

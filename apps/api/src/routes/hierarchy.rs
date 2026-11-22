@@ -6,7 +6,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{error::ApiError, middleware::auth::AuthUser, state::AppState};
+use crate::{
+    error::ApiError, middleware::auth::AuthUser, routes::vaults::require_vault_member,
+    state::AppState,
+};
 use shared::AppError;
 
 /* GET /api/v1/vault/items/:item_id/children */
@@ -14,15 +17,20 @@ pub async fn get_children(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Path(item_id): Path<Uuid>,
+    Query(params): Query<ChildrenQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let db = state.db();
+    require_vault_member(db, params.vault_id, auth.user_id, false).await?;
 
     /* Verify user has at least viewer access to this item */
     let perm: Option<(String,)> = sqlx::query_as(
-        "SELECT role FROM credential_permissions WHERE item_id = $1 AND user_id = $2",
+        "SELECT cp.role FROM credential_permissions cp
+         JOIN vault_items vi ON vi.id = cp.item_id
+         WHERE cp.item_id = $1 AND cp.user_id = $2 AND vi.vault_id = $3",
     )
     .bind(item_id)
     .bind(auth.user_id)
+    .bind(params.vault_id)
     .fetch_optional(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -47,11 +55,12 @@ pub async fn get_children(
          JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $2
          LEFT JOIN credential_key_envelopes cke
            ON cke.item_id = vi.id AND cke.user_id = $2
-         WHERE vi.parent_item_id = $1
+         WHERE vi.parent_item_id = $1 AND vi.vault_id = $3
          ORDER BY vi.created_at ASC",
     )
     .bind(item_id)
     .bind(auth.user_id)
+    .bind(params.vault_id)
     .fetch_all(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -89,10 +98,16 @@ pub async fn get_children(
 
 #[derive(Deserialize)]
 pub struct TreeQuery {
+    vault_id: Uuid,
     depth: Option<i32>,
 }
 
-/* GET /api/v1/vault/tree?depth=N */
+#[derive(Deserialize)]
+pub struct ChildrenQuery {
+    vault_id: Uuid,
+}
+
+/* GET /api/v1/vault/tree?vault_id=...&depth=N */
 pub async fn get_tree(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
@@ -106,6 +121,7 @@ pub async fn get_tree(
     }
 
     let db = state.db();
+    require_vault_member(db, params.vault_id, auth.user_id, false).await?;
 
     /* Recursive CTE: fetch tree N levels deep, only items user can access */
     type TreeRow = (
@@ -124,7 +140,7 @@ pub async fn get_tree(
            JOIN credential_permissions cp ON cp.item_id = vi.id AND cp.user_id = $1
            LEFT JOIN credential_key_envelopes cke
              ON cke.item_id = vi.id AND cke.user_id = $1
-           WHERE vi.parent_item_id IS NULL
+           WHERE vi.parent_item_id IS NULL AND vi.vault_id = $2
            UNION ALL
            SELECT vi.id, vi.parent_item_id, t.depth + 1,
                   vi.encrypted_metadata, vi.encrypted_payload, cke.encrypted_dek
@@ -133,7 +149,7 @@ pub async fn get_tree(
            LEFT JOIN credential_key_envelopes cke
              ON cke.item_id = vi.id AND cke.user_id = $1
            JOIN tree t ON vi.parent_item_id = t.id
-           WHERE t.depth < $2
+           WHERE t.depth < $3 AND vi.vault_id = $2
          )
          SELECT t.id, t.parent_item_id, t.depth,
                 t.encrypted_metadata, t.encrypted_payload, t.encrypted_dek
@@ -141,6 +157,7 @@ pub async fn get_tree(
          ORDER BY t.depth, t.id",
     )
     .bind(auth.user_id)
+    .bind(params.vault_id)
     .bind(depth)
     .fetch_all(db)
     .await
@@ -163,8 +180,11 @@ pub async fn get_tree(
     let mut items: Vec<TreeItem> = Vec::with_capacity(rows.len());
     for (id, parent_id, d, encrypted_metadata, encrypted_payload, encrypted_dek) in rows {
         let (has_children,): (bool,) =
-            sqlx::query_as("SELECT EXISTS(SELECT 1 FROM vault_items WHERE parent_item_id = $1)")
+            sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM vault_items WHERE parent_item_id = $1 AND vault_id = $2)",
+            )
                 .bind(id)
+                .bind(params.vault_id)
                 .fetch_one(db)
                 .await
                 .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;

@@ -35,7 +35,7 @@ const columns = [
         width: '9rem',
     },
 ];
-export default function VaultList({ onCreateCredential }) {
+export default function VaultList({ vaultId, onCreateCredential }) {
     const navigate = useNavigate();
     const privateKey = useVaultStore((state) => state.privateKey);
     const [items, setItems] = useState([]);
@@ -45,7 +45,7 @@ export default function VaultList({ onCreateCredential }) {
     useEffect(() => {
         let cancelled = false;
         const ctrl = new AbortController();
-        apiGet('/api/v1/vault/items?limit=20', { signal: ctrl.signal })
+        apiGet(`/api/v1/vault/items?vault_id=${encodeURIComponent(vaultId)}&limit=20`, { signal: ctrl.signal })
             .then(async (res) => {
             if (!privateKey)
                 throw new Error('Unlock the vault to view credentials.');
@@ -58,7 +58,7 @@ export default function VaultList({ onCreateCredential }) {
             .finally(() => { if (!cancelled)
             setLoading(false); });
         return () => { cancelled = true; ctrl.abort(); };
-    }, [privateKey]);
+    }, [privateKey, vaultId]);
     const filteredItems = useMemo(() => {
         const search = query.trim().toLocaleLowerCase();
         return search
@@ -76,7 +76,7 @@ export default function VaultList({ onCreateCredential }) {
                     border: 'var(--border-input)',
                     borderRadius: 'var(--radius-lg)',
                     background: 'var(--color-bg)',
-                } }), items.some((item) => item.legacy) && (_jsx("p", { role: "status", style: { color: 'var(--color-warning, #865d10)', fontSize: 'var(--text-sm)' }, children: "Legacy credentials are preserved, but their original names, tags, and notes are unavailable to encrypted search and cannot be migrated automatically." })), _jsx(DataTable, { columns: columns, rows: filteredItems, getRowKey: (r) => r.id, onRowClick: (r) => navigate(`/app/vault/${r.id}`), caption: "Vault credentials", className: "vault-credential-table", emptyState: _jsx(EmptyState, { title: query ? 'No matching credentials' : 'Your vault is empty', message: query ? 'Try another search or clear the filter to see all your credentials.' : 'Your encrypted workspace is ready. Add a credential to keep your first secret close and organized.', icon: query ? undefined : _jsx(Plus, { size: 25 }), action: !query ? (_jsxs("button", { type: "button", onClick: onCreateCredential, style: {
+                } }), items.some((item) => item.legacy) && (_jsx("p", { role: "status", style: { color: 'var(--color-warning, #865d10)', fontSize: 'var(--text-sm)' }, children: "Legacy credentials are preserved, but their original names, tags, and notes are unavailable to encrypted search and cannot be migrated automatically." })), _jsx(DataTable, { columns: columns, rows: filteredItems, getRowKey: (r) => r.id, onRowClick: (r) => navigate(`/app/vaults/${vaultId}/items/${r.id}`), caption: "Vault credentials", className: "vault-credential-table", emptyState: _jsx(EmptyState, { title: query ? 'No matching credentials' : 'Your vault is empty', message: query ? 'Try another search or clear the filter to see all your credentials.' : 'Your encrypted workspace is ready. Add a credential to keep your first secret close and organized.', icon: query ? undefined : _jsx(Plus, { size: 25 }), action: !query ? (_jsxs("button", { type: "button", onClick: onCreateCredential, style: {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.5rem',

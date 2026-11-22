@@ -203,7 +203,13 @@ export default function WorkspacesPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <Topbar breadcrumbs={[{ label: 'Workspaces', href: '/app/workspaces' }]} />
+      <Topbar
+        breadcrumbs={[
+          { label: 'Workspaces', href: '/app/workspaces' },
+          { label: 'Manage workspaces', href: '/app/workspaces/manage' },
+        ]}
+        showSearch={false}
+      />
       <main
         className="app-page-content"
         style={{

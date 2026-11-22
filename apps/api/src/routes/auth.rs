@@ -210,12 +210,11 @@ pub async fn register(
 
     let user_id = Uuid::new_v4();
     let workspace_id = Uuid::new_v4();
-    let vault_id = Uuid::new_v4();
     let verify_token = generate_token(128);
     let verify_token_hash = hash_token(&verify_token);
     let expires_at = OffsetDateTime::now_utc() + time::Duration::hours(24);
 
-    // Insert user + vault in single transaction
+    // Insert user and personal workspace in a single transaction.
     let mut tx = db
         .begin()
         .await
@@ -252,14 +251,6 @@ pub async fn register(
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-
-    sqlx::query("INSERT INTO vaults (id, owner_id, workspace_id) VALUES ($1, $2, $3)")
-        .bind(vault_id)
-        .bind(user_id)
-        .bind(workspace_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
 
     tx.commit()
         .await
