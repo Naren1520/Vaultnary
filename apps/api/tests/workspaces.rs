@@ -6,11 +6,16 @@ async fn test_pool() -> PgPool {
     let _ = dotenvy::from_path(env_path);
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set to run workspace database tests");
-    PgPoolOptions::new()
+    let pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&database_url)
         .await
-        .expect("workspace tests require a reachable PostgreSQL database with migrations applied")
+        .expect("workspace tests require a reachable PostgreSQL database");
+    sqlx::migrate!("../../migrations")
+        .run(&pool)
+        .await
+        .expect("workspace tests require database migrations to succeed");
+    pool
 }
 
 #[tokio::test]
@@ -50,14 +55,12 @@ async fn workspace_records_and_membership_roles_are_persisted_consistently() {
         .await
         .expect("insert workspace");
 
-    sqlx::query(
-        "INSERT INTO workspaces (id, name, owner_id) VALUES ($1, 'Second workspace', $2)",
-    )
-    .bind(second_workspace_id)
-    .bind(owner_id)
-    .execute(&mut *tx)
-    .await
-    .expect("insert second workspace");
+    sqlx::query("INSERT INTO workspaces (id, name, owner_id) VALUES ($1, 'Second workspace', $2)")
+        .bind(second_workspace_id)
+        .bind(owner_id)
+        .execute(&mut *tx)
+        .await
+        .expect("insert second workspace");
 
     sqlx::query(
         "INSERT INTO workspace_members (workspace_id, user_id, role)

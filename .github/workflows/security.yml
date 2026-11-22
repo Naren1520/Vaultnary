@@ -41,6 +41,22 @@ jobs:
   rust-tests:
     name: Rust tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: vaultnary_test
+          POSTGRES_USER: vaultnary
+          POSTGRES_PASSWORD: vaultnary_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vaultnary -d vaultnary_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://vaultnary:vaultnary_test_only@localhost:5432/vaultnary_test
     steps:
       - uses: actions/checkout@v4
 
