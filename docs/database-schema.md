@@ -29,6 +29,7 @@ Vaultnary uses PostgreSQL 16 with sequential SQL migrations. All tables use UUID
 | 016_vault_key_material.sql | Encrypted vault private-key material and encrypted credential metadata |
 | 017_account_request_metrics.sql | Per-account minute-bucket request activity |
 | 018_service_vaults.sql | Projects required for services and service-owned vaults |
+| 019_vault_destruction.sql | Scheduled vault destruction, deleted-vault history, and validation/immutability triggers |
 
 ---
 
@@ -100,16 +101,44 @@ CREATE TABLE vaults (
     workspace_id UUID        NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     service_id   UUID        NOT NULL REFERENCES services(id) ON DELETE CASCADE,
     name         TEXT        NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    destroy_at   TIMESTAMPTZ
 );
 CREATE INDEX idx_vaults_workspace_id ON vaults (workspace_id);
 CREATE INDEX idx_vaults_service_id ON vaults (service_id);
+CREATE INDEX idx_vaults_destroy_at ON vaults (destroy_at) WHERE destroy_at IS NOT NULL;
 ```
 
 Key points:
 - A workspace contains projects; each project contains services; each service can contain multiple vaults
 - Vault creation is explicit and happens from the owning service
 - Migration 018 moves existing workspace vaults into a generated "General" project and "Workspace credentials" service so existing credentials remain available
+- `destroy_at` is optional; when set, an API background worker deletes that vault at or after the scheduled time
+- Migration 019's trigger rejects schedules that are not in the future
+
+### deleted_vaults
+
+Immutable history snapshots for vaults deleted manually or by timed destruction.
+
+```sql
+CREATE TABLE deleted_vaults (
+    id                  UUID PRIMARY KEY,
+    owner_id            UUID NOT NULL,
+    workspace_id        UUID,
+    service_id          UUID,
+    name                TEXT NOT NULL,
+    original_created_at TIMESTAMPTZ NOT NULL,
+    destroyed_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_by          UUID,
+    reason              TEXT NOT NULL CHECK (reason IN ('scheduled', 'manual'))
+);
+CREATE INDEX idx_deleted_vaults_owner_destroyed
+    ON deleted_vaults (owner_id, destroyed_at DESC);
+```
+
+The owner, workspace, service, and actor IDs are snapshots rather than foreign keys, so deletion history survives removal of the vault and related parent/account records. The API only returns a user's history when `owner_id` matches the authenticated account. The `trg_deleted_vaults_protect_history_update` trigger blocks UPDATE and DELETE.
+
+Vault destruction is isolated to the selected vault ID: deleting that row cascades to its own credential items, but does not delete its project, service, workspace, or sibling vaults. The worker records the snapshot, audit event, and owner notification in the same transaction. The database triggers validate schedules and protect history; they do not schedule or execute delayed work.
 
 ### vault_items
 
@@ -338,7 +367,9 @@ CREATE TABLE audit_events (
                         'item.deleted', 'item.exported', 'item.imported',
                         'invitation.created', 'invitation.accepted',
                         'invitation.declined', 'invitation.revoked',
-                        'permission.changed'
+                        'permission.changed',
+                        'vault.scheduled', 'vault.destruction_cancelled',
+                        'vault.deleted'
                     )),
     resource_id     UUID,
     resource_type   TEXT,
@@ -379,7 +410,7 @@ Key points:
 
 ### email_outbox
 
-Stores account-lifecycle notifications until Resend confirms delivery.
+Stores account-lifecycle and vault-deletion notifications until Resend confirms delivery.
 
 ```sql
 CREATE TABLE email_outbox (
@@ -394,7 +425,14 @@ CREATE TABLE email_outbox (
 );
 ```
 
-The API inserts notifications in the same transaction as account deletion and ownership changes. A worker retries temporary delivery failures with backoff; successfully delivered messages are removed from the outbox. Notification content does not include credentials, passwords, or encryption keys.
+The API inserts notifications in the same transaction as account deletion, ownership changes, and vault destruction. A worker retries temporary delivery failures with backoff; successfully delivered messages are removed from the outbox. Notification content does not include credentials, passwords, or encryption keys.
+
+### Vault destruction triggers and worker
+
+- `trg_vault_destruction_schedule_guard` calls `validate_vault_destruction_schedule()` before a vault is inserted or `destroy_at` is changed; non-NULL timestamps must be in the future.
+- `trg_deleted_vaults_protect_history_update` calls `protect_deleted_vault_history()` before history rows are updated or deleted, making the history immutable through normal SQL operations.
+- The API background worker—not a database trigger—polls due vaults, locks the specific vault row, and commits the `deleted_vaults` snapshot, vault deletion, audit event, and email-outbox row in one transaction.
+- The worker deletes only the selected vault row. FK cascade removes its credential rows; project, service, workspace, and sibling vault rows are not targeted.
 
 ### Account deletion and ownership transfer
 
@@ -409,15 +447,16 @@ The preview endpoint reports the affected workspaces, owned credentials, collabo
 ```
 users
  ├── auth_sessions (1:N)
- ├── vaults (1:1, unique)
- │    └── vault_items (1:N)
- │         ├── vault_items (self-ref, parent_item_id, tree structure)
- │         ├── credential_permissions (N:M via user_id)
- │         ├── credential_key_envelopes (N:M via user_id)
- │         ├── credential_usage (N → projects OR services)
- │         └── share_invitations (1:N)
  ├── projects (1:N)
  │    └── services (1:N)
+ │         └── vaults (1:N; optional destroy_at)
+ │              └── vault_items (1:N)
+ │                   ├── vault_items (self-ref, parent_item_id, tree structure)
+ │                   ├── credential_permissions (N:M via user_id)
+ │                   ├── credential_key_envelopes (N:M via user_id)
+ │                   ├── credential_usage (N → projects OR services)
+ │                   └── share_invitations (1:N)
+ ├── deleted_vaults (history snapshot; no FK by design)
  ├── user_public_keys (1:N)
  ├── recovery_material (1:1, unique)
  ├── audit_events (as actor_id)

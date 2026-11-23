@@ -30,6 +30,9 @@ export default function ServiceDetail() {
   const [vaultName, setVaultName] = useState('')
   const [creating, setCreating] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [enableTimedDestruction, setEnableTimedDestruction] = useState(false)
+  const [destroyAt, setDestroyAt] = useState('')
+  const [showCreateVault, setShowCreateVault] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -78,10 +81,18 @@ export default function ServiceDetail() {
     try {
       const response = await apiPost<{ data: ServiceVault }>(
         `/api/v1/services/${serviceId}/vaults`,
-        { name },
+        {
+          name,
+          destroy_at: enableTimedDestruction && destroyAt
+            ? new Date(destroyAt).toISOString()
+            : undefined,
+        },
       )
       setVaults((current) => [...current, response.data])
       setVaultName('')
+      setDestroyAt('')
+      setEnableTimedDestruction(false)
+      setShowCreateVault(false)
     } catch (cause) {
       setCreateError(cause instanceof Error ? cause.message : 'Could not create the vault.')
     } finally {
@@ -89,55 +100,149 @@ export default function ServiceDetail() {
     }
   }
 
-  function renderVaultForm(variant: 'empty' | 'card') {
+  function renderVaultCard() {
     return (
-      <form
-        onSubmit={handleCreateVault}
-        className={variant === 'empty'
-          ? 'service-create-vault-form service-create-vault-form--empty'
-          : 'service-create-vault-card'}
+      <button
+        type="button"
+        className="service-create-vault-card service-create-vault-card--compact"
+        onClick={() => {
+          setCreateError('')
+          setShowCreateVault(true)
+        }}
       >
-        {variant === 'empty' && (
-          <div className="service-create-vault-form__intro">
-            <strong>Create your first vault</strong>
-            <span>Choose a name to get started.</span>
-          </div>
-        )}
-        {variant === 'card' && (
-          <>
-            <span className="service-create-vault-card__icon" aria-hidden="true">
-              <Plus size={19} />
-            </span>
-            <div className="service-create-vault-card__intro">
-              <p>Create another vault</p>
-              <span>Keep another set of credentials separate.</span>
-            </div>
-          </>
-        )}
-        <label htmlFor="service-vault-name">Vault name</label>
-        <input
-          id="service-vault-name"
-          name="name"
-          type="text"
-          maxLength={100}
-          value={vaultName}
-          onChange={(event) => setVaultName(event.target.value)}
-          placeholder="e.g. Production credentials"
-          required
-          disabled={creating}
-        />
-        {createError && (
-          <p className="service-create-vault-card__error" role="alert">{createError}</p>
-        )}
-        <button
-          type="submit"
-          className="app-primary-action"
-          disabled={creating || !vaultName.trim()}
+        <span className="service-create-vault-card__icon" aria-hidden="true">
+          <Plus size={20} />
+        </span>
+        <span className="service-create-vault-card__intro">
+          <strong>Create vault</strong>
+          <span>Add another credential vault</span>
+        </span>
+      </button>
+    )
+  }
+
+  function renderCreateVaultModal() {
+    if (!showCreateVault) return null
+
+    return (
+      <div
+        role="presentation"
+        className="app-modal-overlay"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowCreateVault(false)
+        }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.42)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          zIndex: 200,
+          padding: 'var(--space-8) var(--space-4)',
+          overflowY: 'auto',
+        }}
+      >
+        <form
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-vault-title"
+          onSubmit={handleCreateVault}
+          className="app-modal-panel service-create-vault-modal"
+          style={{
+            width: '100%',
+            maxWidth: '32rem',
+            padding: 'var(--space-6)',
+            border: 'var(--border-card)',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-bg)',
+          }}
         >
-          <Plus size={16} aria-hidden="true" />
-          {creating ? 'Creating…' : 'Create vault'}
-        </button>
-      </form>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setShowCreateVault(false)}
+            className="service-create-vault-modal__close"
+          >
+            ×
+          </button>
+          <div className="service-create-vault-modal__heading">
+            <span className="service-create-vault-card__icon" aria-hidden="true">
+              <Plus size={20} />
+            </span>
+            <div>
+              <h2 id="create-vault-title">Create another vault</h2>
+              <p>Keep this set of credentials separate.</p>
+            </div>
+          </div>
+
+          <label htmlFor="service-vault-name">Vault name</label>
+          <input
+            id="service-vault-name"
+            name="name"
+            type="text"
+            maxLength={100}
+            value={vaultName}
+            onChange={(event) => setVaultName(event.target.value)}
+            placeholder="e.g. Production credentials"
+            autoFocus
+            required
+            disabled={creating}
+          />
+
+          <label className="service-create-vault-modal__checkbox">
+            <input
+              type="checkbox"
+              checked={enableTimedDestruction}
+              onChange={(event) => setEnableTimedDestruction(event.target.checked)}
+              disabled={creating}
+            />
+            <span>
+              <strong>Automatically destroy this vault</strong>
+              <small>Choose a date and time in the schedule</small>
+            </span>
+          </label>
+
+          {enableTimedDestruction && (
+            <div className="service-create-vault-modal__destruction">
+              <label htmlFor="service-vault-destroy-at">Destruction date and time</label>
+              <input
+                id="service-vault-destroy-at"
+                type="datetime-local"
+                min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                value={destroyAt}
+                onChange={(event) => setDestroyAt(event.target.value)}
+                required
+                disabled={creating}
+              />
+              <small>Only this vault will be deleted. You can cancel it before the scheduled time.</small>
+            </div>
+          )}
+
+          {createError && (
+            <p className="service-create-vault-modal__error" role="alert">{createError}</p>
+          )}
+
+          <div className="service-create-vault-modal__actions">
+            <button
+              type="button"
+              className="app-secondary-action"
+              onClick={() => setShowCreateVault(false)}
+              disabled={creating}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="app-primary-action"
+              disabled={creating || !vaultName.trim() || (enableTimedDestruction && !destroyAt)}
+            >
+              <Plus size={16} aria-hidden="true" />
+              {creating ? 'Creating…' : 'Create vault'}
+            </button>
+          </div>
+        </form>
+      </div>
     )
   }
 
@@ -205,7 +310,7 @@ export default function ServiceDetail() {
                       </p>
                     </div>
                   </div>
-                  {renderVaultForm('empty')}
+                  {renderVaultCard()}
                 </div>
               ) : (
                 <ul className="service-vault-card-grid">
@@ -224,7 +329,7 @@ export default function ServiceDetail() {
                     </li>
                   ))}
                   <li className="service-vault-create-slot">
-                    {renderVaultForm('card')}
+                    {renderVaultCard()}
                   </li>
                 </ul>
               )}
@@ -232,6 +337,7 @@ export default function ServiceDetail() {
           </>
         )}
       </div>
+      {renderCreateVaultModal()}
     </div>
   )
 }

@@ -36,6 +36,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let state = AppState::new(db.clone(), config.clone());
     tokio::spawn(crate::email_outbox::run(db.clone()));
+    tokio::spawn(crate::vault_destruction::run(db.clone()));
 
     let cors_origin =
         std::env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:5173".to_string());

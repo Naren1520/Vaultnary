@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react'
-import { Download, GitBranch, Plus, Upload } from 'lucide-react'
+import { Download, GitBranch, Plus, Trash2, Upload } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import Topbar from '../../components/ui/Topbar'
 import { useVaultStore } from '../../state/vault-store'
-import { apiPost } from '../../services/http-client'
+import { apiDelete, apiPost, apiPut } from '../../services/http-client'
 import VaultUnlockScreen from './VaultUnlockScreen'
 import VaultList from './VaultList'
 import VaultItemForm from '../../components/forms/VaultItemForm'
@@ -37,10 +37,46 @@ export default function VaultPage() {
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [archiveNotice, setArchiveNotice] = useState('')
+  const [showDestruction, setShowDestruction] = useState(false)
+  const [destroyAt, setDestroyAt] = useState('')
+  const [destructionBusy, setDestructionBusy] = useState(false)
+  const [destructionError, setDestructionError] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
 
   function handleUnlocked() {
     forceUpdate((n) => n + 1)
+  }
+
+  async function handleScheduleDestruction() {
+    if (!vaultId || !destroyAt) return
+    setDestructionBusy(true)
+    setDestructionError('')
+    try {
+      await apiPut(`/api/v1/vaults/${vaultId}/destruction`, {
+        destroy_at: new Date(destroyAt).toISOString(),
+      })
+      setArchiveNotice('Timed destruction scheduled. You can cancel it before the scheduled time.')
+      setShowDestruction(false)
+    } catch (cause) {
+      setDestructionError(cause instanceof Error ? cause.message : 'Could not schedule destruction.')
+    } finally {
+      setDestructionBusy(false)
+    }
+  }
+
+  async function handleCancelDestruction() {
+    if (!vaultId) return
+    setDestructionBusy(true)
+    setDestructionError('')
+    try {
+      await apiDelete(`/api/v1/vaults/${vaultId}/destruction`)
+      setArchiveNotice('Scheduled destruction cancelled.')
+      setShowDestruction(false)
+    } catch (cause) {
+      setDestructionError(cause instanceof Error ? cause.message : 'Could not cancel destruction.')
+    } finally {
+      setDestructionBusy(false)
+    }
   }
 
   async function handleExport() {
@@ -172,6 +208,17 @@ export default function VaultPage() {
               <Upload size={14} aria-hidden="true" />
               Import .env
             </button>
+            <button
+              type="button"
+              onClick={() => setShowDestruction((current) => !current)}
+              style={{ ...actionStyle, color: 'var(--color-danger)' }}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              Timed destruction
+            </button>
+            <Link to="/app/deleted-vaults" className="app-secondary-action">
+              Deleted vaults
+            </Link>
             <input
               ref={fileInput}
               type="file"
@@ -208,6 +255,57 @@ export default function VaultPage() {
           }}
         >
           {archiveError || (archiveBusy ? 'Processing archive...' : archiveNotice)}
+        </div>
+      )}
+
+      {showDestruction && (
+        <div
+          role="group"
+          aria-label="Timed vault destruction"
+          className="vault-destruction-card"
+        >
+          <div className="vault-destruction-card__heading">
+            <span className="vault-destruction-card__icon" aria-hidden="true">
+              <Trash2 size={18} />
+            </span>
+            <div>
+              <strong>Timed vault destruction</strong>
+              <p>Schedule deletion for this vault only. Related projects and other vaults stay safe.</p>
+            </div>
+          </div>
+          <div className="vault-destruction-card__field">
+            <label htmlFor="vault-destroy-at">Delete this vault on</label>
+            <input
+              id="vault-destroy-at"
+              type="datetime-local"
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              value={destroyAt}
+              onChange={(event) => setDestroyAt(event.target.value)}
+              disabled={destructionBusy}
+            />
+          </div>
+          {destructionError && (
+            <p role="alert" className="vault-destruction-card__error">{destructionError}</p>
+          )}
+          <div className="vault-destruction-card__actions">
+            <button
+              type="button"
+              className="app-primary-action"
+              disabled={destructionBusy || !destroyAt}
+              onClick={handleScheduleDestruction}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              {destructionBusy ? 'Saving…' : 'Schedule deletion'}
+            </button>
+            <button
+              type="button"
+              className="app-secondary-action vault-destruction-card__cancel"
+              disabled={destructionBusy}
+              onClick={handleCancelDestruction}
+            >
+              Cancel scheduled deletion
+            </button>
+          </div>
         </div>
       )}
 

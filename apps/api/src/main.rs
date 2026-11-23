@@ -7,6 +7,7 @@ mod middleware;
 mod routes;
 mod state;
 mod time_format;
+mod vault_destruction;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

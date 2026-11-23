@@ -5,7 +5,7 @@ use axum::{
     Extension, Json,
 };
 use serde::Serialize;
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
@@ -578,6 +578,32 @@ pub async fn create_vault(
             }],
         ));
     }
+    let destroy_at = match body.get("destroy_at").and_then(serde_json::Value::as_str) {
+        Some(value) => {
+            let parsed = OffsetDateTime::parse(value, &Rfc3339).map_err(|_| {
+                ApiError::with_details(
+                    AppError::UnprocessableEntity("destroy_at: invalid RFC3339 timestamp".into()),
+                    vec![ErrorDetail {
+                        field: "destroy_at".into(),
+                        rule: "invalid_rfc3339".into(),
+                    }],
+                )
+            })?;
+            if parsed <= OffsetDateTime::now_utc() {
+                return Err(ApiError::with_details(
+                    AppError::UnprocessableEntity(
+                        "destroy_at: must be in the future".into(),
+                    ),
+                    vec![ErrorDetail {
+                        field: "destroy_at".into(),
+                        rule: "must_be_future".into(),
+                    }],
+                ));
+            }
+            Some(parsed)
+        }
+        None => None,
+    };
 
     let db = state.db();
     let workspace_id: Option<(Uuid,)> = sqlx::query_as(
@@ -598,8 +624,8 @@ pub async fn create_vault(
     let id = Uuid::new_v4();
     let created_at = OffsetDateTime::now_utc();
     sqlx::query(
-        "INSERT INTO vaults (id, owner_id, workspace_id, service_id, name, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO vaults (id, owner_id, workspace_id, service_id, name, created_at, destroy_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(id)
     .bind(auth.user_id)
@@ -607,6 +633,7 @@ pub async fn create_vault(
     .bind(service_id)
     .bind(&name)
     .bind(created_at)
+    .bind(destroy_at)
     .execute(db)
     .await
     .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
@@ -620,6 +647,7 @@ pub async fn create_vault(
                 "service_id": service_id,
                 "name": name,
                 "created_at": created_at.to_string(),
+                "destroy_at": destroy_at.map(|value| value.format(&Rfc3339).unwrap_or_else(|_| value.to_string())),
             }
         })),
     ))
@@ -643,21 +671,126 @@ pub async fn delete_vault(
     }
 
     let db = state.db();
-    let workspace_id: Option<(Uuid,)> =
-        sqlx::query_as("SELECT workspace_id FROM vaults WHERE id = $1")
+    let vault: Option<(Uuid, Uuid, Uuid, String, OffsetDateTime, Option<Uuid>)> =
+        sqlx::query_as(
+            "SELECT id, owner_id, workspace_id, name, created_at, service_id
+             FROM vaults WHERE id = $1",
+        )
             .bind(vault_id)
             .fetch_optional(db)
             .await
             .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
-    let workspace_id = workspace_id
-        .map(|(workspace_id,)| workspace_id)
+    let (vault_id, owner_id, workspace_id, vault_name, created_at, service_id) = vault
         .ok_or_else(|| ApiError::new(AppError::NotFound))?;
     let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
     if !role.can_manage() {
         return Err(ApiError::new(AppError::Forbidden));
     }
 
+    let mut tx = db.begin().await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    sqlx::query(
+        "INSERT INTO deleted_vaults
+         (id, owner_id, workspace_id, service_id, name, original_created_at,
+          destroyed_at, deleted_by, reason)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 'manual')",
+    )
+    .bind(vault_id)
+    .bind(owner_id)
+    .bind(workspace_id)
+    .bind(service_id)
+    .bind(&vault_name)
+    .bind(created_at)
+    .bind(auth.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     let result = sqlx::query("DELETE FROM vaults WHERE id = $1")
+        .bind(vault_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    sqlx::query(
+        "INSERT INTO audit_events (actor_id, action_type, resource_id, resource_type)
+         VALUES ($1, 'vault.deleted', $2, 'vault')",
+    )
+    .bind(auth.user_id)
+    .bind(vault_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let recipient: Option<(String,)> =
+        sqlx::query_as("SELECT email FROM users WHERE id = $1")
+            .bind(owner_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    if let Some((recipient_email,)) = recipient {
+        let safe_name = escape_html(&vault_name);
+        let safe_id = escape_html(&vault_id.to_string());
+        sqlx::query(
+            "INSERT INTO email_outbox (recipient_email, subject, html_body)
+             VALUES ($1, $2, $3)",
+        )
+        .bind(&recipient_email)
+        .bind(format!("Vault deleted: {vault_name}"))
+        .bind(format!(
+            "<p>The vault <strong>{safe_name}</strong> was deleted.</p>\
+             <p>Vault ID: <code>{safe_id}</code></p>"
+        ))
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    }
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    Ok(StatusCode::OK.into_response())
+}
+
+pub async fn set_vault_destruction(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path(vault_id): Path<Uuid>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    let value = body
+        .get("destroy_at")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| ApiError::with_details(
+            AppError::UnprocessableEntity("destroy_at: is required".into()),
+            vec![ErrorDetail { field: "destroy_at".into(), rule: "required".into() }],
+        ))?;
+    let destroy_at = OffsetDateTime::parse(value, &Rfc3339).map_err(|_| {
+        ApiError::with_details(
+            AppError::UnprocessableEntity("destroy_at: invalid RFC3339 timestamp".into()),
+            vec![ErrorDetail { field: "destroy_at".into(), rule: "invalid_rfc3339".into() }],
+        )
+    })?;
+    if destroy_at <= OffsetDateTime::now_utc() {
+        return Err(ApiError::with_details(
+            AppError::UnprocessableEntity("destroy_at: must be in the future".into()),
+            vec![ErrorDetail { field: "destroy_at".into(), rule: "must_be_future".into() }],
+        ));
+    }
+
+    let db = state.db();
+    let vault: Option<(Uuid, Uuid)> =
+        sqlx::query_as("SELECT workspace_id, owner_id FROM vaults WHERE id = $1")
+            .bind(vault_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let (workspace_id, _) = vault.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
+    if !role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+    let result = sqlx::query("UPDATE vaults SET destroy_at = $1 WHERE id = $2")
+        .bind(destroy_at)
         .bind(vault_id)
         .execute(db)
         .await
@@ -665,7 +798,130 @@ pub async fn delete_vault(
     if result.rows_affected() == 0 {
         return Err(ApiError::new(AppError::NotFound));
     }
+    sqlx::query(
+        "INSERT INTO audit_events (actor_id, action_type, resource_id, resource_type, metadata)
+         VALUES ($1, 'vault.scheduled', $2, 'vault', $3)",
+    )
+    .bind(auth.user_id)
+    .bind(vault_id)
+    .bind(serde_json::json!({"destroy_at": destroy_at.to_string()}))
+    .execute(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    Ok(Json(serde_json::json!({
+        "data": { "id": vault_id, "destroy_at": destroy_at.format(&Rfc3339).unwrap_or_else(|_| destroy_at.to_string()) }
+    })))
+}
+
+pub async fn cancel_vault_destruction(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path(vault_id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let db = state.db();
+    let vault: Option<(Uuid,)> =
+        sqlx::query_as("SELECT workspace_id FROM vaults WHERE id = $1")
+            .bind(vault_id)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let (workspace_id,) = vault.ok_or_else(|| ApiError::new(AppError::NotFound))?;
+    let role = workspace_member_role(db, workspace_id, auth.user_id).await?;
+    if !role.can_manage() {
+        return Err(ApiError::new(AppError::Forbidden));
+    }
+    let result = sqlx::query("UPDATE vaults SET destroy_at = NULL WHERE id = $1")
+        .bind(vault_id)
+        .execute(db)
+        .await
+        .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::new(AppError::NotFound));
+    }
+    sqlx::query(
+        "INSERT INTO audit_events (actor_id, action_type, resource_id, resource_type)
+         VALUES ($1, 'vault.destruction_cancelled', $2, 'vault')",
+    )
+    .bind(auth.user_id)
+    .bind(vault_id)
+    .execute(db)
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
     Ok(StatusCode::OK.into_response())
+}
+
+#[derive(Serialize)]
+pub struct DeletedVaultSummary {
+    id: Uuid,
+    name: String,
+    original_created_at: String,
+    destroyed_at: String,
+    reason: String,
+}
+
+pub async fn list_deleted_vaults(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+) -> Result<impl IntoResponse, ApiError> {
+    let rows: Vec<(Uuid, String, OffsetDateTime, OffsetDateTime, String)> = sqlx::query_as(
+        "SELECT id, name, original_created_at, destroyed_at, reason
+         FROM deleted_vaults
+         WHERE owner_id = $1
+         ORDER BY destroyed_at DESC",
+    )
+    .bind(auth.user_id)
+    .fetch_all(state.db())
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let data = rows
+        .into_iter()
+        .map(|(id, name, original_created_at, destroyed_at, reason)| DeletedVaultSummary {
+            id,
+            name,
+            original_created_at: original_created_at.to_string(),
+            destroyed_at: destroyed_at.to_string(),
+            reason,
+        })
+        .collect::<Vec<_>>();
+    Ok(Json(serde_json::json!({ "data": data })))
+}
+
+pub async fn get_deleted_vault(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path(vault_id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let row: Option<(Uuid, String, OffsetDateTime, OffsetDateTime, String)> = sqlx::query_as(
+        "SELECT id, name, original_created_at, destroyed_at, reason
+         FROM deleted_vaults
+         WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(vault_id)
+    .bind(auth.user_id)
+    .fetch_optional(state.db())
+    .await
+    .map_err(|e| ApiError::new(AppError::Internal(e.into())))?;
+    let Some((id, name, original_created_at, destroyed_at, reason)) = row else {
+        return Err(ApiError::new(AppError::NotFound));
+    };
+    Ok(Json(serde_json::json!({
+        "data": {
+            "id": id,
+            "name": name,
+            "original_created_at": original_created_at.to_string(),
+            "destroyed_at": destroyed_at.to_string(),
+            "reason": reason
+        }
+    })))
+}
+
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]

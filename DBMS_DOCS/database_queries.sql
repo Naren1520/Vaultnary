@@ -155,13 +155,43 @@ SELECT
     s.name AS service_name,
     s.environment,
     v.owner_id,
-    v.created_at
+    v.created_at,
+    v.destroy_at
 FROM vaults v
 JOIN workspaces w ON w.id = v.workspace_id
 JOIN services s ON s.id = v.service_id
 JOIN projects p ON p.id = s.project_id
 WHERE v.workspace_id = '00000000-0000-0000-0000-000000000000'::uuid
 ORDER BY p.name, s.name, v.name;
+
+-- Show scheduled vault destruction times in a workspace.
+-- This reports metadata only; the application worker performs destruction when due.
+SELECT
+    v.id AS vault_id,
+    v.name AS vault_name,
+    v.destroy_at,
+    s.name AS service_name,
+    p.name AS project_name
+FROM vaults v
+JOIN services s ON s.id = v.service_id
+JOIN projects p ON p.id = s.project_id
+WHERE v.workspace_id = '00000000-0000-0000-0000-000000000000'::uuid
+  AND v.destroy_at IS NOT NULL
+ORDER BY v.destroy_at, v.id;
+
+-- Review deleted-vault history for one account.
+-- IDs and names are retained as audit metadata; the vault content is not recoverable from this table.
+SELECT
+    dv.id AS vault_id,
+    dv.name AS vault_name,
+    dv.original_created_at,
+    dv.destroyed_at,
+    dv.reason,
+    dv.deleted_by
+FROM deleted_vaults dv
+JOIN users u ON u.id = dv.owner_id
+WHERE LOWER(u.email) = LOWER('person@example.com')
+ORDER BY dv.destroyed_at DESC;
 
 -- List vaults created/owned by one account.
 -- This is different from all vaults the account can access through workspace membership.
@@ -458,6 +488,8 @@ UNION ALL
 SELECT 'services', COUNT(*) FROM services
 UNION ALL
 SELECT 'vaults', COUNT(*) FROM vaults
+UNION ALL
+SELECT 'deleted vault history', COUNT(*) FROM deleted_vaults
 UNION ALL
 SELECT 'credentials', COUNT(*) FROM vault_items
 UNION ALL

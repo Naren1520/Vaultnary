@@ -1,5 +1,5 @@
 -- Vaultnary PostgreSQL schema report/reference.
--- Consolidated from migrations/000 through migrations/018 in order.
+-- Consolidated from migrations/000 through migrations/019 in order.
 -- Static source review only: this was not executed or compared with a live database.
 -- The SQLx migration ledger below records the repository migrations represented here.
 -- The main application data flow is workspace -> project -> service -> vault -> credential.
@@ -531,6 +531,86 @@ DROP INDEX IF EXISTS idx_vaults_workspace_id;
 CREATE INDEX idx_vaults_workspace_id ON vaults (workspace_id); -- Supports workspace-based vault listings without enforcing one vault per workspace.
 CREATE INDEX idx_vaults_service_id ON vaults (service_id); -- Supports listing vaults within a service.
 
+-- Migration 019: schedule vault destruction and retain immutable deletion history.
+-- ===== 019_vault_destruction.sql =====
+ALTER TABLE vaults ADD COLUMN IF NOT EXISTS destroy_at TIMESTAMPTZ; -- Optional server-side scheduled destruction time.
+
+CREATE INDEX IF NOT EXISTS idx_vaults_destroy_at
+    ON vaults (destroy_at)
+    WHERE destroy_at IS NOT NULL; -- Lets the background worker find only scheduled vaults.
+
+CREATE TABLE IF NOT EXISTS deleted_vaults (
+    id                  UUID PRIMARY KEY, -- Original vault ID retained as the deletion-history identifier.
+    owner_id            UUID NOT NULL, -- Owner ID snapshot; intentionally not an FK so history survives account deletion.
+    workspace_id        UUID, -- Workspace ID snapshot, not an FK.
+    service_id          UUID, -- Service ID snapshot, not an FK.
+    name                TEXT NOT NULL, -- Name snapshot shown in the deleted-vault history.
+    original_created_at TIMESTAMPTZ NOT NULL, -- Original vault creation time.
+    destroyed_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- Time the vault records were removed.
+    deleted_by          UUID, -- Actor snapshot; NULL for automated destruction.
+    reason              TEXT NOT NULL CHECK (reason IN ('scheduled', 'manual')) -- How the vault was deleted.
+);
+
+CREATE INDEX IF NOT EXISTS idx_deleted_vaults_owner_destroyed
+    ON deleted_vaults (owner_id, destroyed_at DESC); -- Lists deletion history for an account.
+
+CREATE OR REPLACE FUNCTION validate_vault_destruction_schedule()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.destroy_at IS NOT NULL AND NEW.destroy_at <= NOW() THEN
+        RAISE EXCEPTION 'destroy_at must be in the future';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_vault_destruction_schedule_guard ON vaults;
+CREATE TRIGGER trg_vault_destruction_schedule_guard
+BEFORE INSERT OR UPDATE OF destroy_at ON vaults
+FOR EACH ROW
+EXECUTE FUNCTION validate_vault_destruction_schedule();
+
+CREATE OR REPLACE FUNCTION protect_deleted_vault_history()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'deleted vault history records are immutable';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_deleted_vaults_protect_history_update ON deleted_vaults;
+CREATE TRIGGER trg_deleted_vaults_protect_history_update
+BEFORE UPDATE OR DELETE ON deleted_vaults
+FOR EACH ROW
+EXECUTE FUNCTION protect_deleted_vault_history();
+
+ALTER TABLE audit_events DROP CONSTRAINT IF EXISTS audit_events_action_type_check;
+ALTER TABLE audit_events ADD CONSTRAINT audit_events_action_type_check CHECK (action_type IN (
+    'user.registered',
+    'user.login',
+    'user.logout',
+    'user.password_changed',
+    'user.recovery_used',
+    'session.revoked',
+    'item.created',
+    'item.accessed',
+    'item.updated',
+    'item.deleted',
+    'item.exported',
+    'item.imported',
+    'invitation.created',
+    'invitation.accepted',
+    'invitation.declined',
+    'invitation.revoked',
+    'permission.changed',
+    'vault.scheduled',
+    'vault.destruction_cancelled',
+    'vault.deleted'
+));
+
 
 -- SQLx migration ledger: records which numbered migrations the application has applied.
 -- version/description identify each migration; success records its outcome; checksum detects edited migration files.
@@ -564,7 +644,8 @@ INSERT INTO _sqlx_migrations (version, description, success, checksum, execution
     (15, 'account audit purge', true, decode('163ac17e7790dccf4ac0c6d861d2d2348cafc61c46fae641c9ac31e37e0ad6da692999001322f29b0c62714b2cc1fe6d', 'hex'), 0), -- Adds account-related audit cleanup.
     (16, 'vault key material', true, decode('13a08b1ec20053bd0ef9728a6cd5dc93af87d30b0b0cedce0384a1d30c8e6ceaf09f0afe56e2025d2db2eb8a281c74bd', 'hex'), 0), -- Adds vault-key storage.
     (17, 'account request metrics', true, decode('f4eadb888521c18fd6a3c1fd502129f17373ffa53af778e89bec9de09e1d25a8d5bdf54b830e31be1c98f2688e7847e6', 'hex'), 0), -- Adds per-account monitoring metrics.
-    (18, 'service vaults', true, decode('a3c1bcad43a1df4c2c8cac9d74422dc2103863892e6cb1b88297d3b3c11bd8aa89fcc3bccdbebafa956af0b0ee66d6aa', 'hex'), 0); -- Makes vaults service-owned.
+    (18, 'service vaults', true, decode('a3c1bcad43a1df4c2c8cac9d74422dc2103863892e6cb1b88297d3b3c11bd8aa89fcc3bccdbebafa956af0b0ee66d6aa', 'hex'), 0), -- Makes vaults service-owned.
+    (19, 'vault destruction', true, decode('524ea96fe83bdd7b27d83d5fd2e3f2168829af53b42b43d232df952fcdaF2db1884eddcd5691d53a15885fb36a5f4269', 'hex'), 0); -- Adds scheduled destruction and immutable deletion history.
 
 -- End the transaction that groups the migration sequence.
 COMMIT;

@@ -196,6 +196,22 @@ fn v1_routes() -> Router<AppState> {
         )
         .route("/vaults", get(services::list_vaults))
         .route("/vaults/:vault_id", delete(services::delete_vault))
+        .route(
+            "/vaults/:vault_id/destruction",
+            put(services::set_vault_destruction),
+        )
+        .route(
+            "/vaults/:vault_id/destruction",
+            delete(services::cancel_vault_destruction),
+        )
+        .route(
+            "/vaults/deleted",
+            get(services::list_deleted_vaults),
+        )
+        .route(
+            "/vaults/deleted/:vault_id",
+            get(services::get_deleted_vault),
+        )
         // --- Credential Usage ---
         .route("/vault/items/:item_id/usage", post(usage::create_usage))
         .route("/vault/items/:item_id/usage", get(usage::list_usage))

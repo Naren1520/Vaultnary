@@ -2,7 +2,7 @@
 
 ## 1. Scope and source
 
-This guide explains the relational schema represented by the repository's PostgreSQL migrations `000` through `018`. It covers the 18 application tables, their attributes and keys, relationships, constraints, indexes, the SQL function, and the conversion from an ER model to relational tables.
+This guide explains the relational schema represented by the repository's PostgreSQL migrations `000` through `019`. It covers the application tables, their attributes and keys, relationships, constraints, indexes, SQL functions and triggers, and the conversion from an ER model to relational tables.
 
 - [`database_schema.sql`](./database_schema.sql) contains the consolidated, commented migration SQL.
 - [`database_queries.sql`](./database_queries.sql) contains read-only examples for inspecting application data.
@@ -179,6 +179,13 @@ erDiagram
         TIMESTAMPTZ available_at
         INTEGER attempts
     }
+    DELETED_VAULTS {
+        UUID id PK
+        UUID owner_id
+        TEXT name
+        TIMESTAMPTZ destroyed_at
+        TEXT reason
+    }
 
     VAULT_ITEMS ||--o{ CREDENTIAL_USAGE : has_context
     PROJECTS o|--o{ CREDENTIAL_USAGE : project_context
@@ -199,7 +206,7 @@ erDiagram
 
 In the diagram, `VAULT_KEY_MATERIAL.user_id` is both the primary key and a foreign key to `USERS.id`; the connector shows the relationship, and Section 3 describes the dual key role. `ACCOUNT_REQUEST_METRICS` uses the composite primary key `(user_id, bucket_start)`. `CREDENTIAL_USAGE` must reference a credential and at least one of a project or service; it may reference both.
 
-`EMAIL_OUTBOX` and `_sqlx_migrations` are operational tables rather than product entities. `AUDIT_EVENTS.resource_id` is intentionally polymorphic: `resource_type` tells which kind of object it refers to, so it is not a foreign key to one specific table.
+`EMAIL_OUTBOX`, `DELETED_VAULTS`, and `_sqlx_migrations` are operational/history tables rather than active product entities. `DELETED_VAULTS` stores ID/name/ownership snapshots without foreign keys so history remains after related records are removed. `AUDIT_EVENTS.resource_id` is intentionally polymorphic: `resource_type` tells which kind of object it refers to, so it is not a foreign key to one specific table.
 
 ## 3. Table and attribute catalog
 
@@ -299,8 +306,10 @@ In the diagram, `VAULT_KEY_MATERIAL.user_id` is both the primary key and a forei
 | `created_at` | TIMESTAMPTZ, NN | Creation time. |
 | `workspace_id` | UUID, FK → `workspaces.id`, NN | Workspace containing the vault. |
 | `service_id` | UUID, part of composite FK, NN | Owning service; paired with `workspace_id` to enforce same-workspace ownership. |
+| `destroy_at` | TIMESTAMPTZ | Optional scheduled deletion time; NULL means no timed destruction is scheduled. |
 
 The final schema does **not** make `vaults.workspace_id` unique. The earlier unique index was removed when vaults became service-owned.
+Migration 019 indexes scheduled vaults and adds a trigger that rejects a `destroy_at` value that is not in the future.
 
 ### 3.3 Credentials and access
 
@@ -407,14 +416,30 @@ At least one of `project_id` or `service_id` must be populated. Partial unique i
 |---|---|---|
 | `id` | UUID, PK | Event identifier. |
 | `actor_id` | UUID, FK → `users.id` | User who performed the action; set to NULL if that user is deleted. |
-| `action_type` | TEXT, NN; CHECK | Application action such as user/session/item/invitation/permission/export/import activity. |
+| `action_type` | TEXT, NN; CHECK | Application action such as user/session/item/invitation/permission/export/import or vault-destruction activity. |
 | `resource_id` | UUID | Optional ID of the affected object; deliberately not an FK because resources have different tables. |
 | `resource_type` | TEXT | Optional label identifying the resource kind. |
 | `ip_address` | INET | Optional client IP address. |
 | `metadata` | JSONB, NN, default `{}` | Additional structured event details. |
 | `created_at` | TIMESTAMPTZ, NN | Event time. |
 
-The final check constraint includes `export.initiated` and `import.initiated`, added by migration 013. The application treats the table as append-only; a database role can be restricted to SELECT/INSERT. Account deletion has a dedicated purge function, so “append-only” is not an absolute prohibition on all deletion.
+The final check constraint includes `export.initiated` and `import.initiated`, added by migration 013, plus `vault.scheduled`, `vault.destruction_cancelled`, and `vault.deleted`, added by migration 019. The application treats the table as append-only; a database role can be restricted to SELECT/INSERT. Account deletion has a dedicated purge function, so “append-only” is not an absolute prohibition on all deletion.
+
+#### `deleted_vaults` — immutable deletion-history snapshots
+
+| Attribute | Type / key | Meaning |
+|---|---|---|
+| `id` | UUID, PK | ID of the deleted vault, retained for history. |
+| `owner_id` | UUID, NN | Owner ID snapshot; intentionally not an FK. |
+| `workspace_id` | UUID | Workspace ID snapshot, not an FK. |
+| `service_id` | UUID | Service ID snapshot, not an FK. |
+| `name` | TEXT, NN | Vault name snapshot for the history UI. |
+| `original_created_at` | TIMESTAMPTZ, NN | Original vault creation time. |
+| `destroyed_at` | TIMESTAMPTZ, NN, default now | Time deletion was recorded. |
+| `deleted_by` | UUID | Actor snapshot; NULL for automated destruction. |
+| `reason` | TEXT, NN; CHECK | `scheduled` or `manual`. |
+
+No foreign keys are intentional: deleting the vault and its parent service/workspace must not erase the history row. The API scopes history reads by `owner_id`. A trigger rejects UPDATE and DELETE so snapshots remain immutable.
 
 #### `email_outbox` — emails awaiting delivery or retry
 
@@ -521,6 +546,8 @@ These terms describe the conceptual ER model. A table's `ON DELETE CASCADE` beha
 | `vault_key_material.user_id` | `users.id` | Deleting the account cascades to its vault-key record. |
 | `account_request_metrics.user_id` | `users.id` | Deleting the account cascades to its metrics. |
 
+`deleted_vaults.owner_id`, `workspace_id`, `service_id`, and `deleted_by` are snapshots, not foreign keys. This keeps the deletion history available when vault and parent records have been deleted.
+
 `audit_events.resource_id` is not a foreign key. Parent/child credentials are expected by application logic to remain in one vault, but the self-FK alone does not enforce that same-vault rule. The service/project workspace relationship is also checked by application logic; the database's composite FK specifically enforces vault/service workspace consistency.
 
 ## 7. Constraints and indexes
@@ -547,7 +574,10 @@ These terms describe the conceptual ER model. A table's `ON DELETE CASCADE` beha
 
 ## 8. Triggers, functions, and automatic behavior
 
-- **Triggers:** no `CREATE TRIGGER` statement exists in migrations `000`–`018`. There are no database triggers automatically updating timestamps or creating audit rows.
+- **`trg_vault_destruction_schedule_guard`:** BEFORE INSERT or UPDATE OF `vaults.destroy_at`; rejects non-NULL timestamps at or before `NOW()`.
+- **`trg_deleted_vaults_protect_history_update`:** BEFORE UPDATE OR DELETE on `deleted_vaults`; raises an exception to make history immutable.
+- **Vault destruction worker:** the API background worker polls due vaults, locks the specific vault row, and transactionally inserts its history, deletes that vault (cascading only its credentials), records an audit event, and queues the owner's notification email. The database triggers validate scheduled times and protect history; they do not act as a scheduler or perform the deletion.
+- **Trigger functions:** `validate_vault_destruction_schedule()` and `protect_deleted_vault_history()` implement the trigger logic.
 - **Function:** `public.purge_account_audit_events(UUID)` deletes audit rows where the supplied account is the actor or the referenced resource. It is `SECURITY DEFINER`, fixes its `search_path`, revokes execution from `PUBLIC`, and conditionally grants execution to the `vaultnary_app` role if that role exists.
 - **Timestamp updates:** defaults initialize timestamps, but application queries explicitly update fields such as `users.updated_at`, `projects.updated_at`, `services.updated_at`, and `workspaces.updated_at`. They are not maintained by triggers.
 - **Cascades:** deletes propagate according to the FK actions in Section 6; `audit_events.actor_id` and credential-parent links use `SET NULL`.

@@ -29,6 +29,8 @@ const SecurityCenterPage = lazy(() => import('../features/security-center/Securi
 const WorkspacesPage = lazy(() => import('../features/workspaces/WorkspacesPage'))
 const WorkspaceHomePage = lazy(() => import('../features/workspaces/WorkspaceHomePage'))
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage'))
+const DeletedVaultsPage = lazy(() => import('../features/vault/DeletedVaultsPage'))
+const DeletedVaultDetailPage = lazy(() => import('../features/vault/DeletedVaultDetailPage'))
 
 function ProtectedRoute() {
   const csrfToken = useAuthStore((s) => s.csrfToken)
@@ -110,6 +112,8 @@ export const router = createBrowserRouter([
           { path: 'security', element: wrap(SecurityCenterPage) },
           { path: 'audit', element: <Navigate to="/app/security?tab=audit" replace /> },
           { path: 'profile', element: wrap(ProfilePage) },
+          { path: 'deleted-vaults', element: wrap(DeletedVaultsPage) },
+          { path: 'deleted-vaults/:vaultId', element: wrap(DeletedVaultDetailPage) },
         ],
       },
     ],
